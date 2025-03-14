@@ -1,46 +1,86 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { adminLogin, adminLogout, verifyAdminToken } from "@/app/actions/auth"
+
+type AdminUser = {
+  id: string
+  username: string
+  role: string
+}
 
 type AdminAuthContextType = {
   isAuthenticated: boolean
+  user: AdminUser | null
   login: (username: string, password: string) => Promise<boolean>
-  logout: () => void
+  logout: () => Promise<void>
+  loading: boolean
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined)
 
-// In a real app, these would be stored securely in a database
-const ADMIN_USERNAME = "admin"
-const ADMIN_PASSWORD = "admin123"
-
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [user, setUser] = useState<AdminUser | null>(null)
+  const [loading, setLoading] = useState(true)
 
   // Check if admin is already logged in on initial load
   useEffect(() => {
-    const adminAuth = localStorage.getItem("adminAuth")
-    if (adminAuth === "true") {
-      setIsAuthenticated(true)
+    async function checkAuth() {
+      try {
+        const result = await verifyAdminToken()
+        if (result.success && result.admin) {
+          setIsAuthenticated(true)
+          setUser(result.admin)
+        }
+      } catch (error) {
+        console.error("Auth verification error:", error)
+      } finally {
+        setLoading(false)
+      }
     }
+
+    checkAuth()
   }, [])
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // In a real app, this would make an API call to verify credentials
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true)
-      localStorage.setItem("adminAuth", "true")
-      return true
+    try {
+      const result = await adminLogin(username, password)
+      if (result.success && result.admin) {
+        setIsAuthenticated(true)
+        setUser(result.admin)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("Login error:", error)
+      return false
     }
-    return false
   }
 
-  const logout = () => {
-    setIsAuthenticated(false)
-    localStorage.removeItem("adminAuth")
+  const logout = async () => {
+    try {
+      await adminLogout()
+      setIsAuthenticated(false)
+      setUser(null)
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
   }
 
-  return <AdminAuthContext.Provider value={{ isAuthenticated, login, logout }}>{children}</AdminAuthContext.Provider>
+  return (
+    <AdminAuthContext.Provider
+      value={{
+        isAuthenticated,
+        user,
+        login,
+        logout,
+        loading,
+      }}
+    >
+      {children}
+    </AdminAuthContext.Provider>
+  )
 }
 
 export function useAdminAuth() {

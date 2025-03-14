@@ -7,63 +7,73 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String     @id @default(cuid())
-  name      String?
-  email     String     @unique
-  password  String
-  role      String     @default("customer")
-  cartItems CartItem[]
-  orders    Order[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-}
-
 model Product {
-  id          String      @id @default(cuid())
-  name        String
-  description String
-  price       Float
-  image       String?
-  inventory   Int         @default(0)
-  visible     Boolean     @default(true)
-  cartItems   CartItem[]
-  orderItems  OrderItem[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-}
-
-model CartItem {
-  id        String   @id @default(cuid())
-  userId    String
-  productId String
-  quantity  Int      @default(1)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String            @id @default(cuid())
+  name            String
+  description     String?
+  price           Float
+  compareAtPrice  Float?
+  images          String[]
+  category        String?
+  tags            String[]
+  sku             String            @unique
+  barcode         String?
+  inventoryQuantity Int
+  lowStockThreshold Int             @default(5)
+  inventoryManaged Boolean          @default(true)
+  inventoryStatus String            @default("in_stock")
+  attributes      Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  orderItems      OrderItem[]
+  inventoryLogs   InventoryLog[]
 }
 
 model Order {
-  id         String      @id @default(cuid())
-  userId     String
-  status     String      @default("pending")
-  total      Float
-  orderItems OrderItem[]
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id              String            @id
+  items           OrderItem[]
+  total           Float
+  customerName    String
+  customerEmail   String
+  customerAddress String
+  status          String            @default("pending")
+  inventoryUpdated Boolean          @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
-  orderId   String
-  productId String
-  quantity  Int
-  price     Float
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String            @id @default(cuid())
+  order           Order             @relation(fields: [orderId], references: [id])
+  orderId         String
+  product         Product           @relation(fields: [productId], references: [id])
+  productId       String
+  name            String
+  price           Float
+  quantity        Int
+  image           String?
+}
+
+model InventoryLog {
+  id              String            @id @default(cuid())
+  product         Product           @relation(fields: [productId], references: [id])
+  productId       String
+  previousQuantity Int
+  newQuantity     Int
+  reason          String
+  orderId         String?
+  userId          String?
+  timestamp       DateTime          @default(now())
+}
+
+model Admin {
+  id              String            @id @default(cuid())
+  username        String            @unique
+  passwordHash    String
+  name            String?
+  email           String?
+  role            String            @default("admin")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 }
 

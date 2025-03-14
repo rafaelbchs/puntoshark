@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
+import prisma from "@/lib/prisma"
 import type { CartItem } from "@/context/cart-context"
 import { updateInventoryAfterOrder } from "./inventory"
 
@@ -20,9 +21,6 @@ export type Order = {
   updatedAt: string
   inventoryUpdated: boolean
 }
-
-// In-memory storage for orders (in a real app, this would be a database)
-const orders: Order[] = []
 
 // Generate a unique order ID
 function generateOrderId(): string {
@@ -79,23 +77,37 @@ export async function processCheckout(formData: FormData) {
     const orderId = generateOrderId()
     console.log("Server: Generated order ID:", orderId)
 
-    const newOrder: Order = {
-      id: orderId,
-      items: cartItems,
-      total,
-      customerInfo: {
-        name,
-        email,
-        address,
-      },
-      status: "pending",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      inventoryUpdated: false,
-    }
+    // Create order and order items in a transaction
+    const newOrder = await prisma.$transaction(async (tx) => {
+      // Create the order
+      const order = await tx.order.create({
+        data: {
+          id: orderId,
+          total,
+          customerName: name,
+          customerEmail: email,
+          customerAddress: address,
+          status: "pending",
+          inventoryUpdated: false,
+          // Create order items
+          items: {
+            create: cartItems.map((item) => ({
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+              image: item.image,
+              productId: item.id,
+            })),
+          },
+        },
+        include: {
+          items: true,
+        },
+      })
 
-    // Save order (in a real app, this would save to a database)
-    orders.push(newOrder)
+      return order
+    })
+
     console.log("Server: Order created:", newOrder)
 
     // Clear cart after successful order
@@ -106,10 +118,32 @@ export async function processCheckout(formData: FormData) {
     revalidatePath("/checkout")
     revalidatePath("/admin/orders")
 
+    // Transform database model to our application model
+    const orderForClient: Order = {
+      id: newOrder.id,
+      items: newOrder.items.map((item) => ({
+        id: item.productId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image || undefined,
+      })),
+      total: newOrder.total,
+      customerInfo: {
+        name: newOrder.customerName,
+        email: newOrder.customerEmail,
+        address: newOrder.customerAddress,
+      },
+      status: newOrder.status as Order["status"],
+      createdAt: newOrder.createdAt.toISOString(),
+      updatedAt: newOrder.updatedAt.toISOString(),
+      inventoryUpdated: newOrder.inventoryUpdated,
+    }
+
     return {
       success: true,
       orderId: newOrder.id,
-      order: newOrder,
+      order: orderForClient,
     }
   } catch (error) {
     console.error("Server: Checkout error:", error)
@@ -122,32 +156,95 @@ export async function processCheckout(formData: FormData) {
 
 // Get all orders (for admin)
 export async function getOrders() {
-  // In a real app, this would fetch from a database
-  return orders
+  try {
+    const orders = await prisma.order.findMany({
+      include: {
+        items: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    })
+
+    // Transform database models to our application models
+    return orders.map((order) => ({
+      id: order.id,
+      items: order.items.map((item) => ({
+        id: item.productId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image || undefined,
+      })),
+      total: order.total,
+      customerInfo: {
+        name: order.customerName,
+        email: order.customerEmail,
+        address: order.customerAddress,
+      },
+      status: order.status as Order["status"],
+      createdAt: order.createdAt.toISOString(),
+      updatedAt: order.updatedAt.toISOString(),
+      inventoryUpdated: order.inventoryUpdated,
+    }))
+  } catch (error) {
+    console.error("Failed to get orders:", error)
+    throw error
+  }
 }
 
 // Get order by ID
 export async function getOrderById(id: string) {
-  console.log("Server: Getting order by ID:", id)
-  console.log("Server: Available orders:", orders)
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: true,
+      },
+    })
 
-  // In a real app, this would fetch from a database
-  const order = orders.find((order) => order.id === id)
-  console.log("Server: Found order:", order)
+    if (!order) return null
 
-  return order
+    // Transform database model to our application model
+    return {
+      id: order.id,
+      items: order.items.map((item) => ({
+        id: item.productId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image || undefined,
+      })),
+      total: order.total,
+      customerInfo: {
+        name: order.customerName,
+        email: order.customerEmail,
+        address: order.customerAddress,
+      },
+      status: order.status as Order["status"],
+      createdAt: order.createdAt.toISOString(),
+      updatedAt: order.updatedAt.toISOString(),
+      inventoryUpdated: order.inventoryUpdated,
+    }
+  } catch (error) {
+    console.error("Failed to get order by ID:", error)
+    throw error
+  }
 }
 
 // Update order status (for admin)
 export async function updateOrderStatus(id: string, status: Order["status"], userId = "admin") {
   try {
-    // In a real app, this would update the database
-    const orderIndex = orders.findIndex((order) => order.id === id)
-    if (orderIndex === -1) {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: true,
+      },
+    })
+
+    if (!order) {
       return { success: false, error: "Order not found" }
     }
-
-    const order = orders[orderIndex]
 
     // If status is changing to 'completed' and inventory hasn't been updated yet
     if (status === "completed" && !order.inventoryUpdated) {
@@ -155,31 +252,62 @@ export async function updateOrderStatus(id: string, status: Order["status"], use
       const inventoryResult = await updateInventoryAfterOrder(
         id,
         userId,
-        order.items.map((item) => ({ id: item.id, quantity: item.quantity })),
+        order.items.map((item) => ({ id: item.productId, quantity: item.quantity })),
       )
 
       if (inventoryResult.success) {
-        orders[orderIndex].inventoryUpdated = true
+        // Update order with inventory updated flag
+        await prisma.order.update({
+          where: { id },
+          data: {
+            inventoryUpdated: true,
+          },
+        })
       } else {
         console.error("Failed to update inventory:", inventoryResult.error)
         // Continue with status update even if inventory update fails
       }
     }
 
-    // If status is changing from 'completed' to something else and inventory was updated
-    if (order.status === "completed" && status !== "completed" && order.inventoryUpdated) {
-      // In a real app, you would implement logic to revert inventory changes
-      // This is complex and would require careful transaction management
-      console.log("Warning: Changing from completed status. Inventory adjustments should be reviewed.")
-    }
-
-    orders[orderIndex].status = status
-    orders[orderIndex].updatedAt = new Date().toISOString()
+    // Update order status
+    const updatedOrder = await prisma.order.update({
+      where: { id },
+      data: {
+        status,
+        updatedAt: new Date(),
+      },
+      include: {
+        items: true,
+      },
+    })
 
     revalidatePath("/admin/orders")
     revalidatePath(`/admin/orders/${id}`)
 
-    return { success: true, order: orders[orderIndex] }
+    // Transform database model to our application model
+    return {
+      success: true,
+      order: {
+        id: updatedOrder.id,
+        items: updatedOrder.items.map((item) => ({
+          id: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image || undefined,
+        })),
+        total: updatedOrder.total,
+        customerInfo: {
+          name: updatedOrder.customerName,
+          email: updatedOrder.customerEmail,
+          address: updatedOrder.customerAddress,
+        },
+        status: updatedOrder.status as Order["status"],
+        createdAt: updatedOrder.createdAt.toISOString(),
+        updatedAt: updatedOrder.updatedAt.toISOString(),
+        inventoryUpdated: updatedOrder.inventoryUpdated,
+      },
+    }
   } catch (error) {
     console.error("Failed to update order status:", error)
     return { success: false, error: "Failed to update order status" }
