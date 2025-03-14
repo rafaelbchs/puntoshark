@@ -1,14 +1,15 @@
-import './globals.css'
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { ToastProvider } from '@/components/providers/toast-provider'
-import { AuthProvider } from '@/components/providers/auth-provider'
+import type React from "react"
+import "@/app/globals.css"
+import type { Metadata } from "next"
+import { Inter } from "next/font/google"
+import { ThemeProvider } from "@/components/theme-provider"
+import { CartProvider } from "@/context/cart-context"
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: 'Inventory Management System',
-  description: 'Manage your inventory and customer orders',
+  title: "E-commerce Shop",
+  description: "Shopping cart functionality for e-commerce website",
 }
 
 export default function RootLayout({
@@ -19,12 +20,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
-          <ToastProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <CartProvider>
             {children}
-          </ToastProvider>
-        </AuthProvider>
+          </CartProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
 }
+
