@@ -1,75 +1,99 @@
-import { NextAuthOptions } from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@auth/prisma-adapter"
-import { PrismaClient } from "@prisma/client"
-import { compare } from "bcrypt"
+// This file replaces the NextAuth configuration with our custom JWT auth functions
+import { cookies } from "next/headers"
+import { SignJWT, jwtVerify } from "jose"
+import { getServiceSupabase } from "./supabase"
+import bcrypt from "bcryptjs"
 
-const prisma = new PrismaClient()
+// Secret key for JWT
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "fallback_secret_key_for_development_only")
 
-export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
-  session: {
-    strategy: "jwt",
-  },
-  pages: {
-    signIn: "/login", // Custom sign-in page (we'll create this)
-  },
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
+// Admin login
+export async function adminLogin(username: string, password: string) {
+  try {
+    const supabase = getServiceSupabase()
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
-          }
-        })
+    // Find admin by username
+    const { data: admin, error } = await supabase.from("admins").select("*").eq("username", username).single()
 
-        if (!user) {
-          return null
-        }
-
-        const isPasswordValid = await compare(
-          credentials.password,
-          user.password
-        )
-
-        if (!isPasswordValid) {
-          return null
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        }
-      }
-    })
-  ],
-  callbacks: {
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id
-        session.user.name = token.name
-        session.user.email = token.email
-        session.user.role = token.role
-      }
-      return session
-    },
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.role = user.role
-      }
-      return token
+    if (error || !admin) {
+      return { success: false, error: "Invalid credentials" }
     }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, admin.password_hash)
+
+    if (!passwordMatch) {
+      return { success: false, error: "Invalid credentials" }
+    }
+
+    // Create JWT token
+    const token = await new SignJWT({
+      id: admin.id,
+      username: admin.username,
+      role: admin.role,
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("24h")
+      .sign(JWT_SECRET)
+
+    // Set cookie
+    cookies().set("admin_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60 * 24, // 24 hours
+      path: "/",
+    })
+
+    return {
+      success: true,
+      admin: {
+        id: admin.id,
+        username: admin.username,
+        role: admin.role,
+      },
+    }
+  } catch (error) {
+    console.error("Login error:", error)
+    return { success: false, error: "An error occurred during login" }
   }
 }
+
+// Admin logout
+export async function adminLogout() {
+  cookies().delete("admin_token")
+  return { success: true }
+}
+
+// Verify admin token
+export async function verifyAdminToken() {
+  try {
+    const token = cookies().get("admin_token")?.value
+
+    if (!token) {
+      return { success: false, error: "No token found" }
+    }
+
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+
+    return {
+      success: true,
+      admin: {
+        id: payload.id as string,
+        username: payload.username as string,
+        role: payload.role as string,
+      },
+    }
+  } catch (error) {
+    console.error("Token verification error:", error)
+    return { success: false, error: "Invalid token" }
+  }
+}
+
+// Get current admin user
+export async function getCurrentAdmin() {
+  const result = await verifyAdminToken()
+  return result.success ? result.admin : null
+}
+
