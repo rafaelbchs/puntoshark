@@ -1,8 +1,10 @@
-'use client'
+"use client"
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import type React from "react"
 
-type Theme = 'dark' | 'light' | 'system'
+import { createContext, useContext, useEffect, useState } from "react"
+
+type Theme = "dark" | "light" | "system"
 
 type ThemeProviderProps = {
   children: React.ReactNode
@@ -17,7 +19,7 @@ type ThemeProviderState = {
 }
 
 const initialState: ThemeProviderState = {
-  theme: 'system',
+  theme: "system",
   setTheme: () => null,
 }
 
@@ -25,30 +27,28 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 
 export function ThemeProvider({
   children,
-  defaultTheme = 'system',
+  defaultTheme = "system",
   enableSystem = true,
-  attribute = 'data-theme',
+  attribute = "data-theme",
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(defaultTheme)
 
   useEffect(() => {
     const root = window.document.documentElement
-    
+
     // Remove old theme attribute
     root.removeAttribute(attribute)
 
     // Set the new theme attribute
-    if (theme === 'system' && enableSystem) {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light'
-      
-      root.classList.remove('light', 'dark')
+    if (theme === "system" && enableSystem) {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+
+      root.classList.remove("light", "dark")
       root.classList.add(systemTheme)
       root.setAttribute(attribute, systemTheme)
     } else {
-      root.classList.remove('light', 'dark')
+      root.classList.remove("light", "dark")
       root.classList.add(theme)
       root.setAttribute(attribute, theme)
     }
@@ -58,21 +58,21 @@ export function ThemeProvider({
   useEffect(() => {
     if (!enableSystem) return
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+
     const handleChange = () => {
-      if (theme === 'system') {
-        const systemTheme = mediaQuery.matches ? 'dark' : 'light'
+      if (theme === "system") {
+        const systemTheme = mediaQuery.matches ? "dark" : "light"
         const root = window.document.documentElement
-        
-        root.classList.remove('light', 'dark')
+
+        root.classList.remove("light", "dark")
         root.classList.add(systemTheme)
         root.setAttribute(attribute, systemTheme)
       }
     }
 
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
+    mediaQuery.addEventListener("change", handleChange)
+    return () => mediaQuery.removeEventListener("change", handleChange)
   }, [theme, attribute, enableSystem])
 
   const value = {
@@ -89,10 +89,11 @@ export function ThemeProvider({
 
 export const useTheme = () => {
   const context = useContext(ThemeProviderContext)
-  
+
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider')
+    throw new Error("useTheme must be used within a ThemeProvider")
   }
-  
+
   return context
 }
+

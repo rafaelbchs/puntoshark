@@ -37,12 +37,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Save cart to localStorage whenever it changes
+  // Save cart to localStorage and cookies whenever it changes
   useEffect(() => {
     try {
+      // Save to localStorage
       localStorage.setItem("cart", JSON.stringify(items))
+
+      // Save to cookies for server actions
+      document.cookie = `cart=${encodeURIComponent(JSON.stringify(items))}; path=/; max-age=604800; SameSite=Lax`
+
+      console.log("Cart saved:", items)
     } catch (error) {
-      console.error("Failed to save cart to localStorage", error)
+      console.error("Failed to save cart", error)
     }
   }, [items])
 
@@ -81,6 +87,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => {
     setItems([])
+    // Also clear the cookie directly
+    document.cookie = "cart=; path=/; max-age=0; SameSite=Lax"
+    localStorage.removeItem("cart")
+    console.log("Cart cleared")
   }
 
   const totalItems = items.reduce((total, item) => total + item.quantity, 0)

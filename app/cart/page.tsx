@@ -123,7 +123,9 @@ export default function CartPage() {
                 <span>${subtotal.toFixed(2)}</span>
               </div>
             </div>
-            <Button className="w-full mt-6">Proceed to Checkout</Button>
+            <Link href="/checkout" passHref>
+              <Button className="w-full mt-6">Proceed to Checkout</Button>
+            </Link>
             <div className="mt-4 text-center">
               <Link href="/" className="text-sm text-primary hover:underline">
                 Continue Shopping
