@@ -1,103 +1,105 @@
-import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { type NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers"
 
-const prisma = new PrismaClient()
-
-export async function GET() {
+// Get cart from cookies
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const cartCookie = cookies().get("cart")
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!cartCookie?.value) {
+      return NextResponse.json({ items: [] })
     }
 
-    const cart = await prisma.cartItem.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      include: {
-        product: true,
-      },
-    })
+    let cartItems = []
+    try {
+      cartItems = JSON.parse(cartCookie.value)
+    } catch (e) {
+      console.error("Failed to parse cart cookie:", e)
+      return NextResponse.json({ items: [] })
+    }
 
-    const cartItems = cart.map((item) => ({
-      id: item.id,
-      productId: item.productId,
-      name: item.product.name,
-      price: item.product.price,
-      image: item.product.image,
-      quantity: item.quantity,
-    }))
-
-    return NextResponse.json(cartItems)
+    return NextResponse.json({ items: cartItems })
   } catch (error) {
-    console.error("Error fetching cart:", error)
-    return NextResponse.json({ error: "Failed to fetch cart" }, { status: 500 })
+    console.error("Error getting cart:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-export async function POST(request: Request) {
+// Add item to cart
+export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const { id, name, price, image, quantity = 1 } = await request.json()
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!id || !name || !price) {
+      return NextResponse.json({ error: "Product ID, name, and price are required" }, { status: 400 })
     }
 
-    const { productId, quantity } = await request.json()
+    // Get current cart
+    const cartCookie = cookies().get("cart")
+    let cartItems = []
 
-    // Check if product exists and is in stock
-    const product = await prisma.product.findUnique({
-      where: {
-        id: productId,
-      },
-    })
-
-    if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 })
+    if (cartCookie?.value) {
+      try {
+        cartItems = JSON.parse(cartCookie.value)
+      } catch (e) {
+        console.error("Failed to parse cart cookie:", e)
+      }
     }
 
-    if (product.inventory < quantity) {
-      return NextResponse.json({ error: "Not enough inventory" }, { status: 400 })
-    }
+    // Check if item already exists in cart
+    const existingItemIndex = cartItems.findIndex((item) => item.id === id)
 
-    // Check if item already in cart
-    const existingCartItem = await prisma.cartItem.findFirst({
-      where: {
-        userId: session.user.id,
-        productId,
-      },
-    })
-
-    if (existingCartItem) {
-      // Update quantity
-      const updatedCartItem = await prisma.cartItem.update({
-        where: {
-          id: existingCartItem.id,
-        },
-        data: {
-          quantity: existingCartItem.quantity + quantity,
-        },
-      })
-
-      return NextResponse.json(updatedCartItem)
+    if (existingItemIndex >= 0) {
+      // Update quantity if item exists
+      cartItems[existingItemIndex].quantity += quantity
     } else {
-      // Create new cart item
-      const cartItem = await prisma.cartItem.create({
-        data: {
-          userId: session.user.id,
-          productId,
-          quantity,
-        },
+      // Add new item
+      cartItems.push({
+        id,
+        name,
+        price,
+        image,
+        quantity,
       })
-
-      return NextResponse.json(cartItem)
     }
+
+    // Save cart to cookies
+    cookies().set("cart", JSON.stringify(cartItems), {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    })
+
+    return NextResponse.json({
+      success: true,
+      items: cartItems,
+    })
   } catch (error) {
     console.error("Error adding to cart:", error)
-    return NextResponse.json({ error: "Failed to add to cart" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+// Clear cart
+export async function DELETE(request: NextRequest) {
+  try {
+    cookies().set("cart", "[]", {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: "Cart cleared successfully",
+    })
+  } catch (error) {
+    console.error("Error clearing cart:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 

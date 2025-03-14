@@ -1,78 +1,100 @@
-import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { type NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers"
 
-const prisma = new PrismaClient()
-
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+// Update cart item quantity
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
+    const itemId = params.id
     const { quantity } = await request.json()
 
-    // Verify cart item belongs to user
-    const cartItem = await prisma.cartItem.findUnique({
-      where: {
-        id: params.id,
-      },
-    })
-
-    if (!cartItem || cartItem.userId !== session.user.id) {
-      return NextResponse.json({ error: "Cart item not found" }, { status: 404 })
+    if (quantity === undefined || quantity < 0) {
+      return NextResponse.json({ error: "Valid quantity is required" }, { status: 400 })
     }
 
-    // Update quantity
-    const updatedCartItem = await prisma.cartItem.update({
-      where: {
-        id: params.id,
-      },
-      data: {
-        quantity,
-      },
+    // Get current cart
+    const cartCookie = cookies().get("cart")
+    let cartItems = []
+
+    if (cartCookie?.value) {
+      try {
+        cartItems = JSON.parse(cartCookie.value)
+      } catch (e) {
+        console.error("Failed to parse cart cookie:", e)
+        return NextResponse.json({ error: "Invalid cart data" }, { status: 400 })
+      }
+    }
+
+    // Find item in cart
+    const itemIndex = cartItems.findIndex((item) => item.id === itemId)
+
+    if (itemIndex === -1) {
+      return NextResponse.json({ error: "Item not found in cart" }, { status: 404 })
+    }
+
+    if (quantity === 0) {
+      // Remove item if quantity is 0
+      cartItems.splice(itemIndex, 1)
+    } else {
+      // Update quantity
+      cartItems[itemIndex].quantity = quantity
+    }
+
+    // Save cart to cookies
+    cookies().set("cart", JSON.stringify(cartItems), {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
     })
 
-    return NextResponse.json(updatedCartItem)
+    return NextResponse.json({
+      success: true,
+      items: cartItems,
+    })
   } catch (error) {
     console.error("Error updating cart item:", error)
-    return NextResponse.json({ error: "Failed to update cart item" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+// Remove item from cart
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession(authOptions)
+    const itemId = params.id
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // Get current cart
+    const cartCookie = cookies().get("cart")
+    let cartItems = []
+
+    if (cartCookie?.value) {
+      try {
+        cartItems = JSON.parse(cartCookie.value)
+      } catch (e) {
+        console.error("Failed to parse cart cookie:", e)
+        return NextResponse.json({ error: "Invalid cart data" }, { status: 400 })
+      }
     }
 
-    // Verify cart item belongs to user
-    const cartItem = await prisma.cartItem.findUnique({
-      where: {
-        id: params.id,
-      },
+    // Remove item from cart
+    const updatedCart = cartItems.filter((item) => item.id !== itemId)
+
+    // Save cart to cookies
+    cookies().set("cart", JSON.stringify(updatedCart), {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
     })
 
-    if (!cartItem || cartItem.userId !== session.user.id) {
-      return NextResponse.json({ error: "Cart item not found" }, { status: 404 })
-    }
-
-    // Delete cart item
-    await prisma.cartItem.delete({
-      where: {
-        id: params.id,
-      },
+    return NextResponse.json({
+      success: true,
+      items: updatedCart,
     })
-
-    return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error removing cart item:", error)
-    return NextResponse.json({ error: "Failed to remove cart item" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
