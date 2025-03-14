@@ -1,15 +1,25 @@
-import { redirect } from "next/navigation"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import AdminDashboard from "@/components/admin-dashboard"
+"use client"
 
-export default async function AdminPage() {
-  const session = await getServerSession(authOptions)
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAdminAuth } from "@/context/admin-auth-context"
 
-  if (!session || session.user.role !== "admin") {
-    redirect("/api/auth/signin")
-  }
+export default function AdminPage() {
+  const router = useRouter()
+  const { isAuthenticated } = useAdminAuth()
 
-  return <AdminDashboard />
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/admin/orders")
+    } else {
+      router.push("/admin/login")
+    }
+  }, [isAuthenticated, router])
+
+  return (
+    <div className="container mx-auto py-10 px-4 text-center">
+      <p>Redirecting...</p>
+    </div>
+  )
 }
 

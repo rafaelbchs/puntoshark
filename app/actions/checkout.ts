@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 import type { CartItem } from "@/context/cart-context"
+import { updateInventoryAfterOrder } from "./inventory"
 
 // Type for order data
 export type Order = {
@@ -16,6 +17,8 @@ export type Order = {
   }
   status: "pending" | "processing" | "completed" | "cancelled"
   createdAt: string
+  updatedAt: string
+  inventoryUpdated: boolean
 }
 
 // In-memory storage for orders (in a real app, this would be a database)
@@ -87,6 +90,8 @@ export async function processCheckout(formData: FormData) {
       },
       status: "pending",
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      inventoryUpdated: false,
     }
 
     // Save order (in a real app, this would save to a database)
@@ -134,17 +139,50 @@ export async function getOrderById(id: string) {
 }
 
 // Update order status (for admin)
-export async function updateOrderStatus(id: string, status: Order["status"]) {
-  // In a real app, this would update the database
-  const orderIndex = orders.findIndex((order) => order.id === id)
-  if (orderIndex === -1) {
-    return { success: false, error: "Order not found" }
+export async function updateOrderStatus(id: string, status: Order["status"], userId = "admin") {
+  try {
+    // In a real app, this would update the database
+    const orderIndex = orders.findIndex((order) => order.id === id)
+    if (orderIndex === -1) {
+      return { success: false, error: "Order not found" }
+    }
+
+    const order = orders[orderIndex]
+
+    // If status is changing to 'completed' and inventory hasn't been updated yet
+    if (status === "completed" && !order.inventoryUpdated) {
+      // Update inventory for each item in the order
+      const inventoryResult = await updateInventoryAfterOrder(
+        id,
+        userId,
+        order.items.map((item) => ({ id: item.id, quantity: item.quantity })),
+      )
+
+      if (inventoryResult.success) {
+        orders[orderIndex].inventoryUpdated = true
+      } else {
+        console.error("Failed to update inventory:", inventoryResult.error)
+        // Continue with status update even if inventory update fails
+      }
+    }
+
+    // If status is changing from 'completed' to something else and inventory was updated
+    if (order.status === "completed" && status !== "completed" && order.inventoryUpdated) {
+      // In a real app, you would implement logic to revert inventory changes
+      // This is complex and would require careful transaction management
+      console.log("Warning: Changing from completed status. Inventory adjustments should be reviewed.")
+    }
+
+    orders[orderIndex].status = status
+    orders[orderIndex].updatedAt = new Date().toISOString()
+
+    revalidatePath("/admin/orders")
+    revalidatePath(`/admin/orders/${id}`)
+
+    return { success: true, order: orders[orderIndex] }
+  } catch (error) {
+    console.error("Failed to update order status:", error)
+    return { success: false, error: "Failed to update order status" }
   }
-
-  orders[orderIndex].status = status
-  revalidatePath("/admin/orders")
-  revalidatePath(`/admin/orders/${id}`)
-
-  return { success: true }
 }
 
