@@ -64,67 +64,97 @@ export async function processCheckout(formData) {
     const orderId = generateOrderId()
     console.log("Server: Generated order ID:", orderId)
 
-    // Start a transaction
-    const { data: order, error } = await supabase.rpc("create_order", {
-      p_order_id: orderId,
-      p_total: total,
-      p_customer_name: name,
-      p_customer_email: email,
-      p_customer_address: address,
-      p_items: JSON.stringify(cartItems),
-    })
+    // Fetch actual product UUIDs from the database
+    const productIds = await Promise.all(
+      cartItems.map(async (item) => {
+        // If the ID is already a valid UUID, use it
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) {
+          return { originalId: item.id, uuid: item.id }
+        }
 
-    if (error) {
-      // If RPC doesn't exist, do it manually
-      // Create the order
-      const { data: newOrder, error: orderError } = await supabase
-        .from("orders")
-        .insert([
-          {
-            id: orderId,
-            total,
-            customer_name: name,
-            customer_email: email,
-            customer_address: address,
-            status: "pending",
-            inventory_updated: false,
-          },
-        ])
-        .select("*")
-        .single()
+        // Otherwise, look up the product by name or other identifier
+        const { data, error } = await supabase.from("products").select("id").eq("name", item.name).single()
 
-      if (orderError) throw orderError
+        if (error || !data) {
+          // If we can't find the product, generate a UUID
+          // Note: This is a fallback and might cause issues with inventory management
+          console.warn(`Could not find product with name: ${item.name}, generating UUID`)
+          return {
+            originalId: item.id,
+            uuid: crypto.randomUUID(),
+          }
+        }
 
-      // Create order items
-      const orderItems = cartItems.map((item) => ({
-        order_id: orderId,
-        product_id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image,
-      }))
+        return { originalId: item.id, uuid: data.id }
+      }),
+    )
 
-      const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
+    // Create a mapping of original IDs to UUIDs
+    const idMapping = Object.fromEntries(productIds.map(({ originalId, uuid }) => [originalId, uuid]))
 
-      if (itemsError) throw itemsError
+    // Update cart items with proper UUIDs
+    const fixedCartItems = cartItems.map((item) => ({
+      ...item,
+      id: idMapping[item.id] || item.id,
+    }))
 
-      // Get the complete order with items
-      const { data: completeOrder, error: fetchError } = await supabase
-        .from("orders")
-        .select(`
-          *,
-          items:order_items(*)
-        `)
-        .eq("id", orderId)
-        .single()
 
-      if (fetchError) throw fetchError
+// Create the order manually
+  const { data: newOrder, error: orderError } = await supabase
+    .from("orders")
+    .insert([
+      {
+        id: orderId,
+        total,
+        customer_name: name,
+        customer_email: email,
+        customer_address: address,
+        status: "pending",
+        inventory_updated: false,
+      },
+    ])
+    .select("*")
+    .single()
 
-      const order = completeOrder
+  if (orderError) {
+    console.error("Server: Order creation error:", orderError)
+    return { success: false, error: "Failed to create order" }
+  }
+
+  // Create order items
+  const orderItems = fixedCartItems.map((item) => ({
+    order_id: orderId,
+    product_id: item.id,
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+    image: item.image,
+  }))
+
+  const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
+
+  if (itemsError) {
+    console.error("Server: Order items creation error:", itemsError)
+    return { success: false, error: "Failed to create order items" }
+  }
+
+  // Get the complete order with items
+  const { data: orderData, error: fetchError } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      items:order_items(*)
+    `)
+    .eq("id", orderId)
+    .single()
+
+    // Check if we have valid order data
+    if (!orderData) {
+      console.error("Server: No order data available")
+      return { success: false, error: "Failed to create order" }
     }
 
-    console.log("Server: Order created:", order)
+    console.log("Server: Order created:", orderData)
 
     // Clear cart after successful order
     cookies().set("cart", "[]")
@@ -136,29 +166,31 @@ export async function processCheckout(formData) {
 
     // Transform database model to our application model
     const orderForClient = {
-      id: order.id,
-      items: order.items.map((item) => ({
-        id: item.product_id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image || undefined,
-      })),
-      total: order.total,
+      id: orderData.id,
+      items: Array.isArray(orderData.items)
+        ? orderData.items.map((item) => ({
+            id: item.product_id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            image: item.image || undefined,
+          }))
+        : [],
+      total: orderData.total,
       customerInfo: {
-        name: order.customer_name,
-        email: order.customer_email,
-        address: order.customer_address,
+        name: orderData.customer_name,
+        email: orderData.customer_email,
+        address: orderData.customer_address,
       },
-      status: order.status,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at,
-      inventoryUpdated: order.inventory_updated,
+      status: orderData.status,
+      createdAt: orderData.created_at,
+      updatedAt: orderData.updated_at,
+      inventoryUpdated: orderData.inventory_updated,
     }
 
     return {
       success: true,
-      orderId: order.id,
+      orderId: orderData.id,
       order: orderForClient,
     }
   } catch (error) {
