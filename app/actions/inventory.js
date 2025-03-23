@@ -232,10 +232,16 @@ export async function deleteProduct(id) {
 }
 
 // Update inventory quantity
-export async function updateInventory(productId, newQuantity, reason, orderId, userId = "admin") {
+export async function updateInventory(
+  productId,
+  newQuantity,
+  reason,
+  orderId,
+  userId
+) {
   try {
     const supabase = getSupabase()
-
+    
     // Get current product
     const { data: product, error: productError } = await supabase
       .from("products")
@@ -243,8 +249,8 @@ export async function updateInventory(productId, newQuantity, reason, orderId, u
       .eq("id", productId)
       .single()
 
-    if (productError) throw productError
-    if (!product) {
+    if (productError || !product) {
+      console.error("Product fetch error:", productError)
       return { success: false, error: "Product not found" }
     }
 
@@ -253,100 +259,82 @@ export async function updateInventory(productId, newQuantity, reason, orderId, u
     // Determine new status
     const newStatus = determineProductStatus(newQuantity, product.low_stock_threshold)
 
-    // Start a transaction using RPC (you'll need to create this function in Supabase)
-    const { data, error } = await supabase.rpc("update_inventory", {
-      p_product_id: productId,
-      p_new_quantity: newQuantity,
-      p_new_status: newStatus,
-      p_previous_quantity: previousQuantity,
-      p_reason: reason,
-      p_order_id: orderId,
-      p_user_id: userId,
-    })
+    // Update product
+    const { data: updatedProduct, error: updateError } = await supabase
+      .from("products")
+      .update({
+        inventory_quantity: newQuantity,
+        inventory_status: newStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", productId)
+      .select("*")
+      .single()
 
-    if (error) {
-      // If RPC doesn't exist, do it manually
-      // Update product
-      const { data: updatedProduct, error: updateError } = await supabase
-        .from("products")
-        .update({
-          inventory_quantity: newQuantity,
-          inventory_status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", productId)
-        .select("*")
-        .single()
-
-      if (updateError) throw updateError
-
-      // Create inventory log
-      const { data: log, error: logError } = await supabase
-        .from("inventory_logs")
-        .insert([
-          {
-            product_id: productId,
-            previous_quantity: previousQuantity,
-            new_quantity: newQuantity,
-            reason: reason,
-            order_id: orderId,
-            user_id: userId,
-          },
-        ])
-        .select("*")
-        .single()
-
-      if (logError) throw logError
-
-      revalidatePath("/admin/products")
-      revalidatePath(`/admin/products/${productId}`)
-      revalidatePath("/admin/inventory")
-
-      return {
-        success: true,
-        product: {
-          id: updatedProduct.id,
-          name: updatedProduct.name,
-          description: updatedProduct.description || "",
-          price: updatedProduct.price,
-          compareAtPrice: updatedProduct.compare_at_price || undefined,
-          images: updatedProduct.images,
-          category: updatedProduct.category || "",
-          tags: updatedProduct.tags,
-          sku: updatedProduct.sku,
-          barcode: updatedProduct.barcode || undefined,
-          inventory: {
-            quantity: updatedProduct.inventory_quantity,
-            lowStockThreshold: updatedProduct.low_stock_threshold,
-            status: updatedProduct.inventory_status,
-            managed: updatedProduct.inventory_managed,
-          },
-          attributes: updatedProduct.attributes || {},
-          createdAt: updatedProduct.created_at,
-          updatedAt: updatedProduct.updated_at,
-        },
-        log: {
-          id: log.id,
-          productId: log.product_id,
-          previousQuantity: log.previous_quantity,
-          newQuantity: log.new_quantity,
-          reason: log.reason,
-          orderId: log.order_id || undefined,
-          userId: log.user_id || undefined,
-          timestamp: log.timestamp,
-        },
-      }
+    if (updateError) {
+      console.error("Product update error:", updateError)
+      return { success: false, error: "Failed to update product" }
     }
 
-    // If RPC was successful
+    // Create inventory log
+    const { data: log, error: logError } = await supabase
+      .from("inventory_logs")
+      .insert([{
+        product_id: productId,
+        previous_quantity: previousQuantity,
+        new_quantity: newQuantity,
+        reason,
+        order_id: orderId,
+        user_id: userId,
+        timestamp: new Date().toISOString()
+      }])
+      .select("*")
+      .single()
+
+    if (logError) {
+      console.error("Log creation error:", logError)
+      // Continue even if log creation fails
+    }
+
+    // Revalidate paths
     revalidatePath("/admin/products")
     revalidatePath(`/admin/products/${productId}`)
     revalidatePath("/admin/inventory")
 
+    // Transform database models to our application models
     return {
       success: true,
-      product: data.product,
-      log: data.log,
+      product: {
+        id: updatedProduct.id,
+        name: updatedProduct.name,
+        description: updatedProduct.description || "",
+        price: updatedProduct.price,
+        compareAtPrice: updatedProduct.compare_at_price || undefined,
+        images: updatedProduct.images,
+        category: updatedProduct.category || "",
+        tags: updatedProduct.tags,
+        sku: updatedProduct.sku,
+        barcode: updatedProduct.barcode || undefined,
+        inventory: {
+          quantity: updatedProduct.inventory_quantity,
+          lowStockThreshold: updatedProduct.low_stock_threshold,
+          status: updatedProduct.inventory_status,
+          managed: updatedProduct.inventory_managed,
+        },
+        attributes: updatedProduct.attributes || {},
+        createdAt: updatedProduct.created_at,
+        updatedAt: updatedProduct.updated_at,
+      },
+      log: log ? {
+        id: log.id,
+        productId: log.product_id,
+        previousQuantity: log.previous_quantity,
+        newQuantity: log.new_quantity,
+        reason: log.reason,
+        orderId: log.order_id || undefined,
+        userId: log.user_id || undefined,
+        timestamp: log.timestamp,
+      } : undefined,
     }
   } catch (error) {
     console.error("Failed to update inventory:", error)
@@ -365,3 +353,36 @@ function determineProductStatus(quantity, lowStockThreshold) {
   }
 }
 
+export async function getInventoryLogs(productId) {
+  try {
+    const supabase = getSupabase()
+    
+    // Build the query
+    let query = supabase.from("inventory_logs").select("*").order("timestamp", { ascending: false })
+    
+    // Add filter if productId is provided
+    if (productId) {
+      query = query.eq("product_id", productId)
+    }
+    
+    // Execute the query
+    const { data, error } = await query
+    
+    if (error) throw error
+
+    // Transform database models to our application models
+    return data.map((log) => ({
+      id: log.id,
+      productId: log.product_id,
+      previousQuantity: log.previous_quantity,
+      newQuantity: log.new_quantity,
+      reason: log.reason,
+      orderId: log.order_id || undefined,
+      userId: log.user_id || undefined,
+      timestamp: log.timestamp,
+    }))
+  } catch (error) {
+    console.error("Failed to get inventory logs:", error)
+    throw error
+  }
+}

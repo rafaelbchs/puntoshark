@@ -213,97 +213,97 @@ export async function deleteProduct(id: string) {
 }
 
 // Update inventory quantity
-export async function updateInventory(
-  productId: string,
-  newQuantity: number,
-  reason: InventoryUpdateLog["reason"],
-  orderId?: string,
-  userId?: string,
-) {
-  try {
-    // Get current product
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-    })
+// export async function updateInventory(
+//   productId: string,
+//   newQuantity: number,
+//   reason: InventoryUpdateLog["reason"],
+//   orderId?: string,
+//   userId?: string,
+// ) {
+//   try {
+//     // Get current product
+//     const product = await prisma.product.findUnique({
+//       where: { id: productId },
+//     })
 
-    if (!product) {
-      return { success: false, error: "Product not found" }
-    }
+//     if (!product) {
+//       return { success: false, error: "Product not found" }
+//     }
 
-    const previousQuantity = product.inventoryQuantity
+//     const previousQuantity = product.inventoryQuantity
 
-    // Determine new status
-    const newStatus = determineProductStatus(newQuantity, product.lowStockThreshold)
+//     // Determine new status
+//     const newStatus = determineProductStatus(newQuantity, product.lowStockThreshold)
 
-    // Update product in a transaction along with creating a log
-    const [updatedProduct, log] = await prisma.$transaction([
-      // Update product
-      prisma.product.update({
-        where: { id: productId },
-        data: {
-          inventoryQuantity: newQuantity,
-          inventoryStatus: newStatus,
-          updatedAt: new Date(),
-        },
-      }),
+//     // Update product in a transaction along with creating a log
+//     const [updatedProduct, log] = await prisma.$transaction([
+//       // Update product
+//       prisma.product.update({
+//         where: { id: productId },
+//         data: {
+//           inventoryQuantity: newQuantity,
+//           inventoryStatus: newStatus,
+//           updatedAt: new Date(),
+//         },
+//       }),
 
-      // Create inventory log
-      prisma.inventoryLog.create({
-        data: {
-          productId,
-          previousQuantity,
-          newQuantity,
-          reason,
-          orderId,
-          userId,
-        },
-      }),
-    ])
+//       // Create inventory log
+//       prisma.inventoryLog.create({
+//         data: {
+//           productId,
+//           previousQuantity,
+//           newQuantity,
+//           reason,
+//           orderId,
+//           userId,
+//         },
+//       }),
+//     ])
 
-    revalidatePath("/admin/products")
-    revalidatePath(`/admin/products/${productId}`)
-    revalidatePath("/admin/inventory")
+//     revalidatePath("/admin/products")
+//     revalidatePath(`/admin/products/${productId}`)
+//     revalidatePath("/admin/inventory")
 
-    // Transform database models to our application models
-    return {
-      success: true,
-      product: {
-        id: updatedProduct.id,
-        name: updatedProduct.name,
-        description: updatedProduct.description || "",
-        price: updatedProduct.price,
-        compareAtPrice: updatedProduct.compareAtPrice || undefined,
-        images: updatedProduct.images,
-        category: updatedProduct.category || "",
-        tags: updatedProduct.tags,
-        sku: updatedProduct.sku,
-        barcode: updatedProduct.barcode || undefined,
-        inventory: {
-          quantity: updatedProduct.inventoryQuantity,
-          lowStockThreshold: updatedProduct.lowStockThreshold,
-          status: updatedProduct.inventoryStatus as ProductStatus,
-          managed: updatedProduct.inventoryManaged,
-        },
-        attributes: (updatedProduct.attributes as Record<string, string>) || {},
-        createdAt: updatedProduct.createdAt.toISOString(),
-        updatedAt: updatedProduct.updatedAt.toISOString(),
-      },
-      log: {
-        id: log.id,
-        productId: log.productId,
-        previousQuantity: log.previousQuantity,
-        newQuantity: log.newQuantity,
-        reason: log.reason as InventoryUpdateLog["reason"],
-        orderId: log.orderId || undefined,
-        userId: log.userId || undefined,
-        timestamp: log.timestamp.toISOString(),
-      },
-    }
-  } catch (error) {
-    console.error("Failed to update inventory:", error)
-    return { success: false, error: "Failed to update inventory" }
-  }
-}
+//     // Transform database models to our application models
+//     return {
+//       success: true,
+//       product: {
+//         id: updatedProduct.id,
+//         name: updatedProduct.name,
+//         description: updatedProduct.description || "",
+//         price: updatedProduct.price,
+//         compareAtPrice: updatedProduct.compareAtPrice || undefined,
+//         images: updatedProduct.images,
+//         category: updatedProduct.category || "",
+//         tags: updatedProduct.tags,
+//         sku: updatedProduct.sku,
+//         barcode: updatedProduct.barcode || undefined,
+//         inventory: {
+//           quantity: updatedProduct.inventoryQuantity,
+//           lowStockThreshold: updatedProduct.lowStockThreshold,
+//           status: updatedProduct.inventoryStatus as ProductStatus,
+//           managed: updatedProduct.inventoryManaged,
+//         },
+//         attributes: (updatedProduct.attributes as Record<string, string>) || {},
+//         createdAt: updatedProduct.createdAt.toISOString(),
+//         updatedAt: updatedProduct.updatedAt.toISOString(),
+//       },
+//       log: {
+//         id: log.id,
+//         productId: log.productId,
+//         previousQuantity: log.previousQuantity,
+//         newQuantity: log.newQuantity,
+//         reason: log.reason as InventoryUpdateLog["reason"],
+//         orderId: log.orderId || undefined,
+//         userId: log.userId || undefined,
+//         timestamp: log.timestamp.toISOString(),
+//       },
+//     }
+//   } catch (error) {
+//     console.error("Failed to update inventory:", error)
+//     return { success: false, error: "Failed to update inventory" }
+//   }
+// }
 
 // Get inventory logs
 export async function getInventoryLogs(productId?: string) {
