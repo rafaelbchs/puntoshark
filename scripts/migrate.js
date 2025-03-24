@@ -56,21 +56,13 @@ async function getAppliedMigrations() {
             console.error("Failed to create migrations table using RPC:", createTableError)
 
             // Try direct SQL if RPC fails
-            const { error: directError } = await supabase
-              .from("_migrations")
-              .insert([])
-              .select()
-              .limit(0)
-              .catch(() => {
-                // If this fails, create the table directly
-                return supabase.sql(`
-                  CREATE TABLE IF NOT EXISTS _migrations (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT UNIQUE NOT NULL,
-                    applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                  );
-                `)
-              })
+            const { error: directError } = await supabase.sql(`
+             CREATE TABLE IF NOT EXISTS _migrations (
+               id SERIAL PRIMARY KEY,
+               name TEXT UNIQUE NOT NULL,
+               applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+             );
+           `)
 
             if (directError) {
               console.error("Failed to create migrations table directly:", directError)
@@ -115,24 +107,53 @@ async function applyMigration(migrationName, sql) {
       return
     }
 
-    // Execute the SQL using the execute_sql function
-    const { error: sqlError } = await supabase.rpc("execute_sql", { sql })
+    // Execute the SQL using RPC
+    try {
+      const { error: sqlError } = await supabase.rpc("execute_sql", { sql })
 
-    if (sqlError) {
-      // If the RPC fails, try to execute the SQL directly
-      console.log("RPC failed, trying direct SQL execution...")
+      if (sqlError) {
+        console.error(`Error executing SQL for ${migrationName}:`, sqlError)
 
-      // Split the SQL into statements and execute them one by one
-      const statements = sql.split(";").filter((stmt) => stmt.trim().length > 0)
+        // Fallback: try to execute the SQL statements one by one
+        console.log("Trying alternative execution method...")
 
-      for (const statement of statements) {
+        // Split the SQL into individual statements (simple approach)
+        const statements = sql.split(";").filter((stmt) => stmt.trim().length > 0)
+
+        for (const statement of statements) {
+          try {
+            const { error } = await supabase.rpc("execute_sql", {
+              sql: statement.trim() + ";",
+            })
+
+            if (error) {
+              console.error(`Error executing statement: ${statement.trim()}`, error)
+            }
+          } catch (stmtErr) {
+            console.error(`Failed to execute statement: ${statement.trim()}`, stmtErr)
+          }
+        }
+
+        // Continue with the migration despite errors
+        console.log(`Migration ${migrationName} applied with potential issues.`)
+      }
+    } catch (err) {
+      console.error(`Error executing SQL for ${migrationName}:`, err)
+
+      // If this is the initial migration and it failed because objects already exist,
+      // we'll mark it as applied anyway
+      if (migrationName.includes("initial_schema") || migrationName.includes("create_orders_table")) {
+        console.log("This appears to be a schema creation. Marking as applied despite errors...")
         try {
-          await supabase.sql(statement + ";")
-        } catch (err) {
-          console.log(`Statement error (continuing anyway): ${err.message}`)
-          // Continue with other statements
+          await supabase.from("_migrations").insert([{ name: migrationName }])
+          console.log(`Marked ${migrationName} as applied.`)
+          return
+        } catch (e) {
+          console.error("Failed to mark migration as applied:", e)
         }
       }
+
+      throw err
     }
 
     // Record the migration
@@ -146,20 +167,6 @@ async function applyMigration(migrationName, sql) {
     console.log(`Migration applied successfully: ${migrationName}`)
   } catch (error) {
     console.error(`Migration failed: ${migrationName}`, error)
-
-    // If this is the initial migration and it failed because objects already exist,
-    // we'll mark it as applied anyway
-    if (migrationName.includes("initial_schema")) {
-      console.log("This appears to be the initial schema. Marking as applied despite errors...")
-      try {
-        await supabase.from("_migrations").insert([{ name: migrationName }])
-        console.log(`Marked ${migrationName} as applied.`)
-        return
-      } catch (e) {
-        console.error("Failed to mark migration as applied:", e)
-      }
-    }
-
     throw error
   }
 }

@@ -44,8 +44,8 @@ export default function AdminOrderDetailPage() {
       if (result.success) {
         setOrder({ ...order, status })
         toast({
-          title: "Status updated",
-          description: `Order status changed to ${status}`,
+          title: "Estado actualizado",
+          description: `Estado del pedido cambiado a ${getStatusText(status)}`,
           duration: 2000,
         })
       }
@@ -57,10 +57,56 @@ export default function AdminOrderDetailPage() {
   const copyOrderId = () => {
     navigator.clipboard.writeText(orderId)
     toast({
-      title: "Copied to clipboard",
-      description: "Order ID has been copied to your clipboard",
+      title: "Copiado al portapapeles",
+      description: "ID del pedido copiado al portapapeles",
       duration: 2000,
     })
+  }
+
+  // Helper function to translate status to Spanish
+  function getStatusText(status: string): string {
+    switch (status) {
+      case "pending":
+        return "Pendiente"
+      case "processing":
+        return "Procesando"
+      case "completed":
+        return "Completado"
+      case "cancelled":
+        return "Cancelado"
+      default:
+        return status
+    }
+  }
+
+  // Helper function to translate delivery method to Spanish
+  function getDeliveryMethodText(method?: string): string {
+    switch (method) {
+      case "mrw":
+        return "Envío Nacional (MRW)"
+      case "delivery":
+        return "Delivery (Maracaibo)"
+      case "pickup":
+        return "Pick-Up"
+      default:
+        return method || "No especificado"
+    }
+  }
+
+  // Helper function to translate payment method to Spanish
+  function getPaymentMethodText(method?: string): string {
+    switch (method) {
+      case "pagoMovil":
+        return "Pago Móvil"
+      case "zelle":
+        return "Zelle"
+      case "binance":
+        return "Binance"
+      case "efectivo":
+        return "Efectivo"
+      default:
+        return method || "No especificado"
+    }
   }
 
   return (
@@ -72,28 +118,28 @@ export default function AdminOrderDetailPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold">Order Details</h1>
+          <h1 className="text-3xl font-bold">Detalles del Pedido</h1>
         </div>
 
         {loading ? (
-          <p className="text-center py-8">Loading order details...</p>
+          <p className="text-center py-8">Cargando detalles del pedido...</p>
         ) : !order ? (
           <div className="text-center py-8">
-            <h2 className="text-xl font-semibold mb-4">Order Not Found</h2>
-            <Button onClick={() => router.push("/admin/orders")}>Back to Orders</Button>
+            <h2 className="text-xl font-semibold mb-4">Pedido No Encontrado</h2>
+            <Button onClick={() => router.push("/admin/orders")}>Volver a Pedidos</Button>
           </div>
         ) : (
           <>
             {/* Prominent Order ID Display */}
             <div className="bg-muted p-4 rounded-lg mb-6 flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Order ID</p>
+                <p className="text-sm text-muted-foreground">ID del Pedido</p>
                 <div className="flex items-center gap-2">
                   <p className="text-xl font-mono font-bold tracking-wider">{order.id}</p>
                   <button
                     onClick={copyOrderId}
                     className="p-1 rounded-md hover:bg-background transition-colors"
-                    aria-label="Copy order ID"
+                    aria-label="Copiar ID del pedido"
                   >
                     <Copy className="h-4 w-4" />
                   </button>
@@ -111,7 +157,7 @@ export default function AdminOrderDetailPage() {
                         : "bg-red-100 text-red-800"
                 }
               >
-                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                {getStatusText(order.status)}
               </Badge>
             </div>
 
@@ -121,14 +167,14 @@ export default function AdminOrderDetailPage() {
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle>Order Summary</CardTitle>
-                        <CardDescription>Placed on {new Date(order.createdAt).toLocaleString()}</CardDescription>
+                        <CardTitle>Resumen del Pedido</CardTitle>
+                        <CardDescription>Realizado el {new Date(order.createdAt).toLocaleString()}</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div>
-                      <h3 className="font-medium mb-2">Items</h3>
+                      <h3 className="font-medium mb-2">Artículos</h3>
                       <div className="space-y-4">
                         {order.items.map((item) => (
                           <div key={item.id} className="flex justify-between">
@@ -157,20 +203,32 @@ export default function AdminOrderDetailPage() {
               <div>
                 <Card className="mb-6">
                   <CardHeader>
-                    <CardTitle>Customer Information</CardTitle>
+                    <CardTitle>Información del Cliente</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <p className="font-medium">{order.customerInfo.name}</p>
+                    <p>Cédula: {order.customerInfo.cedula || "N/A"}</p>
+                    <p>Teléfono: {order.customerInfo.phone || "N/A"}</p>
                     <p>{order.customerInfo.email}</p>
                     <Separator className="my-2" />
-                    <h3 className="font-medium">Shipping Address</h3>
-                    <p className="whitespace-pre-line">{order.customerInfo.address}</p>
+                    <h3 className="font-medium">Método de Entrega</h3>
+                    <p>{getDeliveryMethodText(order.customerInfo.deliveryMethod)}</p>
+                    {order.customerInfo.deliveryMethod === "mrw" && <p>Oficina MRW: {order.customerInfo.mrwOffice}</p>}
+                    {order.customerInfo.deliveryMethod === "delivery" && (
+                      <>
+                        <h3 className="font-medium">Dirección de Entrega</h3>
+                        <p className="whitespace-pre-line">{order.customerInfo.address}</p>
+                      </>
+                    )}
+                    <Separator className="my-2" />
+                    <h3 className="font-medium">Método de Pago</h3>
+                    <p>{getPaymentMethodText(order.customerInfo.paymentMethod)}</p>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Order Status</CardTitle>
+                    <CardTitle>Estado del Pedido</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Select
@@ -178,19 +236,19 @@ export default function AdminOrderDetailPage() {
                       onValueChange={(value) => handleStatusChange(value as Order["status"])}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Status" />
+                        <SelectValue placeholder="Estado" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="pending">Pendiente</SelectItem>
+                        <SelectItem value="processing">Procesando</SelectItem>
+                        <SelectItem value="completed">Completado</SelectItem>
+                        <SelectItem value="cancelled">Cancelado</SelectItem>
                       </SelectContent>
                     </Select>
                   </CardContent>
                   <CardFooter className="flex flex-col gap-2">
                     <Button variant="outline" className="w-full" onClick={() => window.print()}>
-                      Print Order
+                      Imprimir Pedido
                     </Button>
                   </CardFooter>
                 </Card>
