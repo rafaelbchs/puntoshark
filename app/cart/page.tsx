@@ -6,7 +6,8 @@ import Link from "next/link"
 import { useCart } from "@/context/cart-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal, totalItems } = useCart()
@@ -30,107 +31,174 @@ export default function CartPage() {
   }
 
   return (
-    <div className="container mx-auto py-16 px-4">
-      <h1 className="text-3xl font-bold mb-8">
+    <div className="container mx-auto py-8 px-4 md:py-16">
+      <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">
         Your Cart ({totalItems} {totalItems === 1 ? "item" : "items"})
       </h1>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">Product</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="w-[80px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <div className="relative h-20 w-20 rounded-md overflow-hidden">
-                        <Image
-                          src={item.image || "/placeholder.svg?height=80&width=80"}
-                          alt={item.name}
-                          fill
-                          className="object-cover"
-                        />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-4">
+          {/* Mobile and tablet view - Card layout */}
+          <div className="lg:hidden space-y-4">
+            {items.map((item) => (
+              <Card key={item.id} className="overflow-hidden">
+                <CardContent className="p-4">
+                  <div className="flex gap-4">
+                    <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border">
+                      <Image
+                        src={item.image || "/placeholder.svg?height=80&width=80"}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex flex-1 flex-col">
+                      <h3 className="font-medium line-clamp-2">{item.name}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">${item.price.toFixed(2)}</p>
+
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center border rounded-md">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-r-none"
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            disabled={item.quantity <= 1}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateQuantity(item.id, Number.parseInt(e.target.value) || 1)}
+                            className="h-8 w-10 rounded-none text-center border-x [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-l-none"
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <p className="font-medium">${(item.price * item.quantity).toFixed(2)}</p>
+                          <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)} className="h-8 w-8">
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop view - Table-like layout */}
+          <div className="hidden lg:block border rounded-lg overflow-hidden">
+            <div className="grid grid-cols-12 bg-muted p-4 text-sm font-medium">
+              <div className="col-span-6">Product</div>
+              <div className="col-span-2 text-center">Quantity</div>
+              <div className="col-span-3 text-right">Price</div>
+              <div className="col-span-1"></div>
+            </div>
+
+            <div className="divide-y">
+              {items.map((item) => (
+                <div key={item.id} className="grid grid-cols-12 p-4 items-center">
+                  <div className="col-span-6 flex items-center gap-4">
+                    <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border">
+                      <Image
+                        src={item.image || "/placeholder.svg?height=64&width=64"}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div>
                       <h3 className="font-medium">{item.name}</h3>
                       <p className="text-sm text-muted-foreground">${item.price.toFixed(2)}</p>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 rounded-r-none"
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          disabled={item.quantity <= 1}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateQuantity(item.id, Number.parseInt(e.target.value) || 1)}
-                          className="h-8 w-14 rounded-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 rounded-l-none"
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">${(item.price * item.quantity).toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)}>
-                        <Trash className="h-4 w-4" />
+                    </div>
+                  </div>
+
+                  <div className="col-span-2 flex justify-center">
+                    <div className="flex items-center">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 rounded-r-none"
+                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        disabled={item.quantity <= 1}
+                      >
+                        <Minus className="h-3 w-3" />
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => updateQuantity(item.id, Number.parseInt(e.target.value) || 1)}
+                        className="h-8 w-14 rounded-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 rounded-l-none"
+                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="col-span-3 text-right font-medium">${(item.price * item.quantity).toFixed(2)}</div>
+
+                  <div className="col-span-1 text-right">
+                    <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)}>
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         <div>
-          <div className="border rounded-lg p-6">
-            <h2 className="text-lg font-bold mb-4">Order Summary</h2>
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Shipping</span>
-                <span>Calculated at checkout</span>
-              </div>
-              <div className="border-t pt-4 flex justify-between font-bold">
-                <span>Total</span>
-                <span>${subtotal.toFixed(2)}</span>
-              </div>
-            </div>
-            <Link href="/checkout" passHref>
-              <Button className="w-full mt-6">Proceed to Checkout</Button>
-            </Link>
-            <div className="mt-4 text-center">
-              <Link href="/" className="text-sm text-primary hover:underline">
-                Continue Shopping
-              </Link>
-            </div>
+          <div className="sticky top-4">
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-lg font-bold mb-4">Order Summary</h2>
+                <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Shipping</span>
+                    <span>Calculated at checkout</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-bold">
+                    <span>Total</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+
+                  <Link href="/checkout" passHref>
+                    <Button className="w-full mt-2">Proceed to Checkout</Button>
+                  </Link>
+
+                  <div className="text-center mt-4">
+                    <Link href="/" className="text-sm text-primary hover:underline">
+                      Continue Shopping
+                    </Link>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
