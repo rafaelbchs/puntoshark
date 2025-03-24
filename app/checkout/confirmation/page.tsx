@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { CheckCircle, Copy, Share2, Loader2 } from "lucide-react"
+import { CheckCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -221,6 +221,59 @@ export default function ConfirmationPage() {
     }
   }
 
+  const shareToWhatsApp = () => {
+    if (!orderId) return
+
+    // Create the message text
+    let messageText = `¡Mi pedido #${orderId} ha sido confirmado!`
+
+    // Add the admin link to the order ID
+    const orderLink = `${baseUrl}/api/order-redirect/${orderId}`
+    messageText += `\nVer detalles del pedido: ${orderLink}`
+
+    // Add order details if available
+    if (order) {
+      // Customer info
+      messageText += `\n\nDatos del cliente:`
+      messageText += `\n• Nombre: ${order.customerInfo.name}`
+      messageText += `\n• Cédula: ${order.customerInfo.cedula || "No especificada"}`
+      messageText += `\n• Email: ${order.customerInfo.email}`
+      messageText += `\n• Teléfono: ${order.customerInfo.phone || "No especificado"}`
+
+      // Delivery method
+      messageText += `\n\nMétodo de entrega: ${getDeliveryMethodText(order.customerInfo.deliveryMethod)}`
+      if (order.customerInfo.deliveryMethod === "mrw") {
+        messageText += `\n• Oficina MRW: ${order.customerInfo.mrwOffice}`
+      } else if (order.customerInfo.deliveryMethod === "delivery") {
+        messageText += `\n• Dirección: ${order.customerInfo.address}`
+      }
+
+      // Payment method
+      messageText += `\n\nMétodo de pago: ${getPaymentMethodText(order.customerInfo.paymentMethod)}`
+
+      // Order summary
+      messageText += `\n\nResumen del pedido:`
+      messageText += `\n• Total de artículos: ${order.items.length}`
+
+      // Add product list if not too many
+      if (order.items.length <= 5) {
+        messageText += `\n\nProductos:`
+        order.items.forEach((item, index) => {
+          messageText += `\n${index + 1}. ${item.name} (${item.quantity}x) - $${(item.price * item.quantity).toFixed(2)}`
+        })
+      }
+
+      // Add total amount at the bottom
+      messageText += `\n\nMonto total: $${order.total.toFixed(2)}`
+    }
+
+    // Encode the message for URL
+    const encodedMessage = encodeURIComponent(messageText)
+
+    // Open WhatsApp with the specific link and message
+    window.open(`https://wa.me/message/3O5MPVAHHE2CK1?text=${encodedMessage}`, "_blank")
+  }
+
   // Usar el mismo estilo de overlay de carga que en la página de checkout
   if (loading || isFromCheckout) {
     return (
@@ -266,14 +319,25 @@ export default function ConfirmationPage() {
             <div className="bg-muted p-4 rounded-md flex items-center justify-center gap-2 mb-4">
               <span className="text-2xl font-mono font-bold tracking-wider">{orderId}</span>
             </div>
-            <div className="flex gap-2 justify-center">
-              <Button variant="outline" size="sm" onClick={copyOrderId} className="flex items-center gap-2">
-                <Copy className="h-4 w-4" />
-                {copied ? "¡Copiado!" : "Copiar ID"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={shareOrder} className="flex items-center gap-2">
-                <Share2 className="h-4 w-4" />
-                Compartir
+            <div className="flex justify-center">
+              <Button
+                onClick={shareToWhatsApp}
+                className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-2"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="white"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M17.498 14.382c-.301-.15-1.767-.867-2.04-.966-.273-.101-.473-.15-.673.15-.2.3-.767.966-.94 1.164-.173.199-.347.223-.646.075-.3-.15-1.267-.465-2.414-1.485-.893-.795-1.494-1.781-1.67-2.079-.173-.3-.018-.461.13-.61.134-.133.3-.345.45-.52.149-.174.199-.3.299-.498.1-.2.05-.374-.025-.524-.075-.15-.672-1.62-.922-2.217-.24-.584-.487-.51-.672-.51-.172 0-.371-.025-.571-.025-.2 0-.523.074-.797.374-.273.3-1.045 1.02-1.045 2.488s1.07 2.887 1.22 3.086c.149.2 2.095 3.2 5.076 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.571-.347m-5.498-11.707c-2.757 0-5.112.968-7.075 2.92A9.847 9.847 0 0 0 2 13.685c0 1.846.478 3.553 1.406 5.087L2 24.001l5.429-1.43a9.953 9.953 0 0 0 4.571 1.106c2.756 0 5.112-.967 7.074-2.92a9.846 9.846 0 0 0 2.926-7.091c0-2.759-.986-5.112-2.926-7.06-1.962-1.952-4.317-2.92-7.074-2.92m0 19.662a8.327 8.327 0 0 1-4.341-1.203l-.308-.183-3.2.836.85-3.102-.2-.314a8.233 8.233 0 0 1-1.299-4.439c0-2.311.806-4.275 2.417-5.876a8.036 8.036 0 0 1 5.881-2.425c2.311 0 4.275.806 5.876 2.425a8.035 8.035 0 0 1 2.424 5.876 8.034 8.034 0 0 1-2.424 5.876 8.034 8.034 0 0 1-5.876 2.424" />
+                </svg>
+                Compartir por WhatsApp
               </Button>
             </div>
           </CardContent>
