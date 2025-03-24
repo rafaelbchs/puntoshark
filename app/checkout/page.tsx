@@ -28,10 +28,24 @@ export default function CheckoutPage() {
     return null
   }
 
+  // Añade este código justo después de la línea "if (typeof window !== "undefined" && items.length === 0) {"
+  // para crear un overlay de carga
+
+  // Añade este componente de overlay de carga
+  const LoadingOverlay = () => (
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-lg font-medium">Procesando tu pedido...</p>
+        <p className="text-sm text-muted-foreground">Estamos preparando tu confirmación</p>
+      </div>
+    </div>
+  )
+
   // Determine if cash payment should be shown
   const showCashOption = deliveryMethod === "delivery" || deliveryMethod === "pickup"
 
-  // Reemplaza la función handleSubmit con esta versión modificada que usa window.location.href para la redirección
+  // Reemplaza la función handleSubmit con esta versión mejorada que muestra un overlay de carga
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsSubmitting(true)
@@ -59,9 +73,6 @@ export default function CheckoutPage() {
       console.log("Resultado del checkout:", result)
 
       if (result.success) {
-        // Clear cart first
-        clearCart()
-
         // Store the order data in sessionStorage for the confirmation page
         if (result.order) {
           try {
@@ -76,6 +87,11 @@ export default function CheckoutPage() {
 
         // Use window.location.href for a hard redirect instead of router.push
         window.location.href = `/checkout/confirmation?orderId=${result.orderId}`
+
+        // Clear cart after redirect is initiated
+        // This happens asynchronously, so the user won't see the empty cart
+        setTimeout(() => clearCart(), 500)
+
         return // Important: stop execution here
       } else {
         console.error("Checkout fallido:", result.error)
@@ -91,6 +107,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="container mx-auto py-10 px-4">
+      {isSubmitting && <LoadingOverlay />}
       <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
       <div className="grid gap-8 lg:grid-cols-2">
@@ -177,32 +194,6 @@ export default function CheckoutPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* {paymentMethod === "pagoMovil" && (
-                  <div className="p-4 bg-muted rounded-md">
-                    <p className="font-medium">Instrucciones para Pago Móvil:</p>
-                    <p className="text-sm mt-2">Realiza tu pago al número: 0414-1234567</p>
-                    <p className="text-sm">Banco: Mercantil</p>
-                    <p className="text-sm">CI: V-12345678</p>
-                  </div>
-                )}
-
-                {paymentMethod === "zelle" && (
-                  <div className="p-4 bg-muted rounded-md">
-                    <p className="font-medium">Instrucciones para Zelle:</p>
-                    <p className="text-sm mt-2">Envía tu pago a: email@example.com</p>
-                    <p className="text-sm">Nombre: John Doe</p>
-                  </div>
-                )}
-
-                {paymentMethod === "binance" && (
-                  <div className="p-4 bg-muted rounded-md">
-                    <p className="font-medium">Instrucciones para Binance:</p>
-                    <p className="text-sm mt-2">Envía USDT a la siguiente dirección:</p>
-                    <p className="text-sm break-all">0x1234567890abcdef1234567890abcdef12345678</p>
-                    <p className="text-sm mt-2">Red: BEP20 (BSC)</p>
-                  </div>
-                )} */}
               </CardContent>
               <CardFooter className="flex flex-col items-stretch">
                 {error && (
