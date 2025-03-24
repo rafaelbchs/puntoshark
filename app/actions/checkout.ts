@@ -291,7 +291,7 @@ export async function getOrderById(id: string): Promise<Order | null> {
 }
 
 // Update order status (for admin)
-export async function updateOrderStatus(id: string, status: OrderStatus, userId: string = "admin"): Promise<OrderUpdateResult> {
+export async function updateOrderStatus(id: string, status: OrderStatus, userId = "admin"): Promise<OrderUpdateResult> {
   try {
     const supabase = getSupabase()
 
@@ -385,4 +385,3 @@ export async function updateOrderStatus(id: string, status: OrderStatus, userId:
     return { success: false, error: "Failed to update order status" }
   }
 }
-

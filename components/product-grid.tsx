@@ -1,3 +1,5 @@
+// If you're using a client-side product grid component, let's update it too
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -27,7 +29,11 @@ export default function ProductGrid() {
       try {
         const response = await fetch("/api/products")
         const data = await response.json()
-        setProducts(data.filter((product) => product.visible))
+
+        // Filter out any discontinued products that might have slipped through
+        const activeProducts = data.products.filter((product: any) => product.inventory?.status !== "discontinued")
+
+        setProducts(activeProducts)
         setLoading(false)
       } catch (error) {
         console.error("Error fetching products:", error)

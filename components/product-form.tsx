@@ -234,6 +234,43 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="discontinued">Mark as discontinued</Label>
+                  <Switch
+                    id="discontinued"
+                    checked={formData.inventory?.status === "discontinued"}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          inventory: {
+                            ...prev.inventory,
+                            status: "discontinued",
+                            managed: false,
+                          },
+                        }))
+                      } else {
+                        // If unchecking, determine the appropriate status based on quantity
+                        const newStatus = determineStatus(formData.inventoryQuantity, formData.lowStockThreshold)
+                        setFormData((prev) => ({
+                          ...prev,
+                          inventory: {
+                            ...prev.inventory,
+                            status: newStatus,
+                            managed: true,
+                          },
+                        }))
+                      }
+                    }}
+                  />
+                </div>
+                {formData.inventory?.status === "discontinued" && (
+                  <p className="text-sm text-muted-foreground">
+                    Discontinued products won't appear in the store but will remain in the database for order history.
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { getProducts, deleteProduct } from "@/app/actions/inventory"
+import { getProducts, deleteProduct, updateProduct } from "@/app/actions/inventory"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -56,11 +56,56 @@ export default function AdminProductsPage() {
     setDeleteDialogOpen(true)
   }
 
+  // Add a new function to handle marking a product as discontinued
+  const markAsDiscontinued = async (productId: string) => {
+    try {
+      const product = products.find((p) => p.id === productId)
+      if (!product) return
+
+      const result = await updateProduct(productId, {
+        inventory: {
+          ...product.inventory,
+          status: "discontinued",
+          managed: false,
+        },
+      })
+
+      if (result.success) {
+        // Update the product in the local state
+        setProducts(
+          products.map((p) =>
+            p.id === productId ? { ...p, inventory: { ...p.inventory, status: "discontinued", managed: false } } : p,
+          ),
+        )
+
+        toast({
+          title: "Product Discontinued",
+          description: "Product has been marked as discontinued",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update product",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to mark product as discontinued:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Modify the confirmDelete function to handle products in orders
   const confirmDelete = async () => {
     if (!productToDelete) return
 
     try {
       const result = await deleteProduct(productToDelete)
+
       if (result.success) {
         setProducts(products.filter((product) => product.id !== productToDelete))
         toast({
@@ -68,11 +113,34 @@ export default function AdminProductsPage() {
           description: "Product deleted successfully",
         })
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to delete product",
-          variant: "destructive",
-        })
+        // If the product can't be deleted because it's in orders, offer to mark it as discontinued
+        if (result.error?.includes("Cannot delete product that has been ordered")) {
+          toast({
+            title: "Cannot Delete Product",
+            description:
+              "This product has been ordered by customers. Would you like to mark it as discontinued instead?",
+            variant: "destructive",
+            action: (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  markAsDiscontinued(productToDelete)
+                  setDeleteDialogOpen(false)
+                  setProductToDelete(null)
+                }}
+                className="mt-2"
+              >
+                Mark as Discontinued
+              </Button>
+            ),
+          })
+        } else {
+          toast({
+            title: "Error",
+            description: result.error || "Failed to delete product",
+            variant: "destructive",
+          })
+        }
       }
     } catch (error) {
       console.error("Failed to delete product:", error)
