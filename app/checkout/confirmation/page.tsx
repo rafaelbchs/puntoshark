@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { CheckCircle, Copy, Share2 } from "lucide-react"
+import { CheckCircle, Copy, Share2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -39,6 +39,7 @@ export default function ConfirmationPage() {
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Mejora la experiencia de carga inicial añadiendo un efecto de transición suave
   useEffect(() => {
     // Try to get the order from sessionStorage
     async function getOrderData() {
@@ -53,8 +54,13 @@ export default function ConfirmationPage() {
           console.log("Customer info:", parsedOrder.customerInfo)
           console.log("Delivery method:", parsedOrder.customerInfo.deliveryMethod)
           console.log("Payment method:", parsedOrder.customerInfo.paymentMethod)
-          setOrder(parsedOrder)
-          setLoading(false)
+
+          // Pequeño retraso para permitir que la página se renderice primero
+          // y evitar el parpadeo de la pantalla de carga
+          setTimeout(() => {
+            setOrder(parsedOrder)
+            setLoading(false)
+          }, 300)
 
           // Clear the sessionStorage after retrieving the order
           sessionStorage.removeItem("lastOrder")
@@ -73,11 +79,16 @@ export default function ConfirmationPage() {
               console.log("Customer info from API:", fetchedOrder.customerInfo)
               console.log("Delivery method from API:", fetchedOrder.customerInfo.deliveryMethod)
               console.log("Payment method from API:", fetchedOrder.customerInfo.paymentMethod)
-              setOrder(fetchedOrder)
+
+              // Pequeño retraso para permitir que la página se renderice primero
+              setTimeout(() => {
+                setOrder(fetchedOrder)
+                setLoading(false)
+              }, 300)
             } else {
               setError("Detalles del pedido no encontrados. Por favor contacta a soporte con tu ID de pedido.")
+              setLoading(false)
             }
-            setLoading(false)
           } else {
             console.log("No order ID found in URL")
             setError("No se encontró información del pedido.")
@@ -131,8 +142,12 @@ export default function ConfirmationPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-16 px-4 text-center">
-        <p>Cargando información del pedido...</p>
+      <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-lg font-medium">Finalizando tu pedido...</p>
+          <p className="text-sm text-muted-foreground">Estamos preparando tu confirmación</p>
+        </div>
       </div>
     )
   }

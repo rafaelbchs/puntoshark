@@ -205,7 +205,8 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
     console.log("Server: Order created:", orderData)
 
     // Clear cart after successful order
-    cookies().set("cart", "[]")
+    // No limpiamos el carrito aquí, lo haremos en el cliente después de la redirección
+    // cookies().set("cart", "[]")
 
     // Revalidate relevant paths
     revalidatePath("/cart")
