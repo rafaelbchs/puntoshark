@@ -4,7 +4,13 @@ import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 import { getServiceSupabase } from "@/lib/supabase"
 import { updateInventory } from "./inventory"
-import type { Order, OrderStatus, CheckoutResult, OrderUpdateResult, CartItem } from "@/types/checkout"
+import type {
+  Order as OrderType,
+  OrderStatus as OrderStatusType,
+  CheckoutResult,
+  OrderUpdateResult,
+  CartItem as CartItemType,
+} from "@/types/checkout"
 
 // Get Supabase admin client
 const getSupabase = () => getServiceSupabase()
@@ -28,22 +34,22 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
 
     if (!cartCookie?.value) {
       console.log("Server: No cart cookie found")
-      return { success: false, error: "Cart is empty" }
+      return { success: false, error: "El carrito está vacío" }
     }
 
-    let cartItems: CartItem[] = []
+    let cartItems: CartItemType[] = []
     try {
       cartItems = JSON.parse(cartCookie.value)
     } catch (e) {
       console.error("Server: Failed to parse cart cookie:", e)
-      return { success: false, error: "Invalid cart data" }
+      return { success: false, error: "Datos de carrito inválidos" }
     }
 
     console.log("Server: Cart items:", cartItems)
 
     if (!cartItems.length) {
       console.log("Server: Cart is empty")
-      return { success: false, error: "Cart is empty" }
+      return { success: false, error: "El carrito está vacío" }
     }
 
     // Calculate total
@@ -52,13 +58,44 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
     // Get customer info from form
     const name = formData.get("name") as string
     const email = formData.get("email") as string
-    const address = formData.get("address") as string
+    const cedula = formData.get("cedula") as string
+    const phone = formData.get("phone") as string
+    const deliveryMethod = formData.get("deliveryMethod") as string
+    const paymentMethod = formData.get("paymentMethod") as string
 
-    console.log("Server: Customer info:", { name, email, address })
+    // Get conditional fields based on delivery method
+    let address = ""
+    let mrwOffice = ""
 
-    if (!name || !email || !address) {
+    if (deliveryMethod === "delivery") {
+      address = formData.get("address") as string
+    } else if (deliveryMethod === "mrw") {
+      mrwOffice = formData.get("mrwOffice") as string
+    }
+
+    console.log("Server: Customer info:", {
+      name,
+      email,
+      cedula,
+      phone,
+      deliveryMethod,
+      paymentMethod,
+      address,
+      mrwOffice,
+    })
+
+    if (!name || !email || !cedula || !phone || !deliveryMethod || !paymentMethod) {
       console.log("Server: Missing customer info")
-      return { success: false, error: "Missing required customer information" }
+      return { success: false, error: "Falta información requerida del cliente" }
+    }
+
+    // Validate delivery method specific fields
+    if (deliveryMethod === "delivery" && !address) {
+      return { success: false, error: "La dirección de entrega es requerida para delivery" }
+    }
+
+    if (deliveryMethod === "mrw" && !mrwOffice) {
+      return { success: false, error: "La oficina de MRW es requerida para envío nacional" }
     }
 
     // Create new order
@@ -108,7 +145,12 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
           total,
           customer_name: name,
           customer_email: email,
+          customer_cedula: cedula,
+          customer_phone: phone,
           customer_address: address,
+          delivery_method: deliveryMethod,
+          payment_method: paymentMethod,
+          mrw_office: mrwOffice,
           status: "pending",
           inventory_updated: false,
         },
@@ -117,8 +159,14 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
       .single()
 
     if (orderError) {
-      console.error("Server: Order creation error:", orderError)
-      return { success: false, error: "Failed to create order" }
+      console.error("Server: Order creation error details:", {
+        code: orderError.code,
+        message: orderError.message,
+        details: orderError.details,
+        hint: orderError.hint,
+        error: orderError,
+      })
+      return { success: false, error: `Error al crear el pedido: ${orderError.message}` }
     }
 
     // Create order items
@@ -135,7 +183,7 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
 
     if (itemsError) {
       console.error("Server: Order items creation error:", itemsError)
-      return { success: false, error: "Failed to create order items" }
+      return { success: false, error: "Error al crear los items del pedido" }
     }
 
     // Get the complete order with items
@@ -151,7 +199,7 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
     // Check if we have valid order data
     if (!orderData) {
       console.error("Server: No order data available")
-      return { success: false, error: "Failed to create order" }
+      return { success: false, error: "Error al crear el pedido" }
     }
 
     console.log("Server: Order created:", orderData)
@@ -180,7 +228,12 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
       customerInfo: {
         name: orderData.customer_name,
         email: orderData.customer_email,
+        cedula: orderData.customer_cedula,
+        phone: orderData.customer_phone,
         address: orderData.customer_address,
+        deliveryMethod: orderData.delivery_method,
+        paymentMethod: orderData.payment_method,
+        mrwOffice: orderData.mrw_office,
       },
       status: orderData.status,
       createdAt: orderData.created_at,
@@ -188,22 +241,34 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
       inventoryUpdated: orderData.inventory_updated,
     }
 
+    // Add this log to verify the data being sent to the client
+    console.log("Server: Order data for client:", orderForClient)
+    console.log("Server: Customer info:", orderForClient.customerInfo)
+
+    // At the end of the function, before returning the result
+    console.log("Server: Checkout completed successfully. Order ID:", orderData.id)
+    console.log("Server: Order data for client:", orderForClient)
+
     return {
       success: true,
       orderId: orderData.id,
       order: orderForClient,
     }
   } catch (error) {
-    console.error("Server: Checkout error:", error)
+    console.error("Server: Checkout error details:", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      error,
+    })
     return {
       success: false,
-      error: "Failed to process checkout",
+      error: "Error al procesar el checkout",
     }
   }
 }
 
 // Get all orders (for admin)
-export async function getOrders(): Promise<Order[]> {
+export async function getOrders(): Promise<OrderType[]> {
   try {
     const supabase = getSupabase()
 
@@ -231,7 +296,12 @@ export async function getOrders(): Promise<Order[]> {
       customerInfo: {
         name: order.customer_name,
         email: order.customer_email,
+        cedula: order.customer_cedula,
+        phone: order.customer_phone,
         address: order.customer_address,
+        deliveryMethod: order.delivery_method,
+        paymentMethod: order.payment_method,
+        mrwOffice: order.mrw_office,
       },
       status: order.status,
       createdAt: order.created_at,
@@ -245,7 +315,7 @@ export async function getOrders(): Promise<Order[]> {
 }
 
 // Get order by ID
-export async function getOrderById(id: string): Promise<Order | null> {
+export async function getOrderById(id: string): Promise<OrderType | null> {
   try {
     const supabase = getSupabase()
 
@@ -277,7 +347,12 @@ export async function getOrderById(id: string): Promise<Order | null> {
       customerInfo: {
         name: data.customer_name,
         email: data.customer_email,
+        cedula: data.customer_cedula,
+        phone: data.customer_phone,
         address: data.customer_address,
+        deliveryMethod: data.delivery_method,
+        paymentMethod: data.payment_method,
+        mrwOffice: data.mrw_office,
       },
       status: data.status,
       createdAt: data.created_at,
@@ -291,7 +366,11 @@ export async function getOrderById(id: string): Promise<Order | null> {
 }
 
 // Update order status (for admin)
-export async function updateOrderStatus(id: string, status: OrderStatus, userId = "admin"): Promise<OrderUpdateResult> {
+export async function updateOrderStatus(
+  id: string,
+  status: OrderStatusType,
+  userId = "admin",
+): Promise<OrderUpdateResult> {
   try {
     const supabase = getSupabase()
 
@@ -308,7 +387,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus, userId 
     if (orderError) throw orderError
 
     if (!order) {
-      return { success: false, error: "Order not found" }
+      return { success: false, error: "Pedido no encontrado" }
     }
 
     // If status is changing to 'completed' and inventory hasn't been updated yet
@@ -372,7 +451,12 @@ export async function updateOrderStatus(id: string, status: OrderStatus, userId 
         customerInfo: {
           name: data.customer_name,
           email: data.customer_email,
+          cedula: data.customer_cedula,
+          phone: data.customer_phone,
           address: data.customer_address,
+          deliveryMethod: data.delivery_method,
+          paymentMethod: data.payment_method,
+          mrwOffice: data.mrw_office,
         },
         status: data.status,
         createdAt: data.created_at,
@@ -382,6 +466,61 @@ export async function updateOrderStatus(id: string, status: OrderStatus, userId 
     }
   } catch (error) {
     console.error("Failed to update order status:", error)
-    return { success: false, error: "Failed to update order status" }
+    return { success: false, error: "Error al actualizar el estado del pedido" }
   }
 }
+
+export type OrderStatus = "pending" | "processing" | "completed" | "cancelled"
+
+export type OrderItem = {
+  id: string
+  product_id: string
+  name: string
+  price: number
+  quantity: number
+  image?: string
+}
+
+export type CustomerInfo = {
+  name: string
+  email: string
+  cedula?: string
+  phone?: string
+  address: string
+  deliveryMethod?: string
+  paymentMethod?: string
+  mrwOffice?: string
+}
+
+export type Order = {
+  id: string
+  items: OrderItem[]
+  total: number
+  customerInfo: CustomerInfo
+  status: OrderStatus
+  createdAt: string
+  updatedAt: string
+  inventoryUpdated: boolean
+}
+
+export type CartItem = {
+  id: string
+  name: string
+  price: number
+  quantity: number
+  image?: string
+}
+
+// export type CheckoutResult = {
+//   success: boolean
+//   orderId?: string
+//   order?: Order
+//   error?: string
+// }
+
+// export type OrderUpdateResult = {
+//   success: boolean
+//   order?: Order
+//   error?: string
+// }
+
