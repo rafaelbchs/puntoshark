@@ -20,7 +20,7 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (items.length === 0) {
+  if (typeof window !== "undefined" && items.length === 0) {
     router.push("/cart")
     return null
   }
@@ -50,8 +50,8 @@ export default function CheckoutPage() {
 
         console.log("Navigating to confirmation page with orderId:", result.orderId)
 
-        // Navigate to the confirmation page
-        window.location.href = `/checkout/confirmation?orderId=${result.orderId}`
+        // Navigate to the confirmation page - using router.push instead of window.location
+        router.push(`/checkout/confirmation?orderId=${result.orderId}`)
       } else {
         console.error("Checkout failed:", result.error)
         setError(result.error || "Failed to process checkout")

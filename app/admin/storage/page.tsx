@@ -76,26 +76,37 @@ export default function StorageManagementPage() {
 
       // Get file counts and sizes for each bucket
       const bucketsWithInfo = await Promise.all(
-        data.map(async (bucket) => {
-          const { data: files, error: filesError } = await supabase.storage.from(bucket.name).list()
+        (data || []).map(async (bucket) => {
+          if (!bucket) return null
 
-          if (filesError) {
+          try {
+            const { data: files, error: filesError } = await supabase.storage.from(bucket.name).list()
+
+            if (filesError) {
+              return {
+                ...bucket,
+                file_count: 0,
+                size: 0,
+              }
+            }
+
+            return {
+              ...bucket,
+              file_count: files?.length || 0,
+              size: (files || []).reduce((total, file) => total + (file?.metadata?.size || 0), 0),
+            }
+          } catch (err) {
+            console.error(`Error getting info for bucket ${bucket.name}:`, err)
             return {
               ...bucket,
               file_count: 0,
               size: 0,
             }
           }
-
-          return {
-            ...bucket,
-            file_count: files.length,
-            size: files.reduce((total, file) => total + (file.metadata?.size || 0), 0),
-          }
         }),
       )
 
-      setBuckets(bucketsWithInfo)
+      setBuckets(bucketsWithInfo.filter(Boolean) as BucketInfo[])
     } catch (error) {
       console.error("Error fetching buckets:", error)
       toast({
@@ -119,16 +130,22 @@ export default function StorageManagementPage() {
       }
 
       // Convert to FileObject format
-      const fileObjects = data.map((item) => ({
-        id: item.id,
-        name: item.name,
-        bucket_id: bucket,
-        owner: "",
-        created_at: item.created_at || "",
-        updated_at: item.updated_at || "",
-        last_accessed_at: item.last_accessed_at || "",
-        metadata: item.metadata || { size: 0, mimetype: "" },
-      }))
+      const fileObjects = (data || [])
+        .map((item) => {
+          if (!item) return null
+
+          return {
+            id: item.id || `file-${Date.now()}-${Math.random()}`,
+            name: item.name || "",
+            bucket_id: bucket,
+            owner: "",
+            created_at: item.created_at || "",
+            updated_at: item.updated_at || "",
+            last_accessed_at: item.last_accessed_at || "",
+            metadata: item.metadata || { size: 0, mimetype: "" },
+          }
+        })
+        .filter(Boolean) as FileObject[]
 
       setFiles(fileObjects)
     } catch (error) {
@@ -532,7 +549,7 @@ export default function StorageManagementPage() {
             </div>
             <DialogFooter>
               <Button asChild>
-                <a href={getFileUrl(selectedFile!)} target="_blank" rel="noopener noreferrer">
+                <a href={selectedFile ? getFileUrl(selectedFile) : "#"} target="_blank" rel="noopener noreferrer">
                   Open in New Tab
                 </a>
               </Button>
