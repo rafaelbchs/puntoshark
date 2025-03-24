@@ -31,6 +31,8 @@ async function fetchOrderById(orderId: string) {
   }
 }
 
+// Modifica el componente ConfirmationPage para manejar mejor la transición
+
 export default function ConfirmationPage() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get("orderId")
@@ -39,8 +41,20 @@ export default function ConfirmationPage() {
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Mejora la experiencia de carga inicial añadiendo un efecto de transición suave
+  // Verificar si venimos de un checkout exitoso
+  const [isFromCheckout, setIsFromCheckout] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("checkoutSubmitting") === "true"
+    }
+    return false
+  })
+
   useEffect(() => {
+    // Limpiar el indicador de checkout
+    if (typeof window !== "undefined" && isFromCheckout) {
+      sessionStorage.removeItem("checkoutSubmitting")
+    }
+
     // Try to get the order from sessionStorage
     async function getOrderData() {
       try {
@@ -55,12 +69,12 @@ export default function ConfirmationPage() {
           console.log("Delivery method:", parsedOrder.customerInfo.deliveryMethod)
           console.log("Payment method:", parsedOrder.customerInfo.paymentMethod)
 
-          // Pequeño retraso para permitir que la página se renderice primero
-          // y evitar el parpadeo de la pantalla de carga
+          setOrder(parsedOrder)
+
+          // Retrasar ligeramente el cambio de estado de carga para evitar parpadeos
           setTimeout(() => {
-            setOrder(parsedOrder)
             setLoading(false)
-          }, 300)
+          }, 100)
 
           // Clear the sessionStorage after retrieving the order
           sessionStorage.removeItem("lastOrder")
@@ -80,15 +94,15 @@ export default function ConfirmationPage() {
               console.log("Delivery method from API:", fetchedOrder.customerInfo.deliveryMethod)
               console.log("Payment method from API:", fetchedOrder.customerInfo.paymentMethod)
 
-              // Pequeño retraso para permitir que la página se renderice primero
-              setTimeout(() => {
-                setOrder(fetchedOrder)
-                setLoading(false)
-              }, 300)
+              setOrder(fetchedOrder)
             } else {
               setError("Detalles del pedido no encontrados. Por favor contacta a soporte con tu ID de pedido.")
-              setLoading(false)
             }
+
+            // Retrasar ligeramente el cambio de estado de carga para evitar parpadeos
+            setTimeout(() => {
+              setLoading(false)
+            }, 100)
           } else {
             console.log("No order ID found in URL")
             setError("No se encontró información del pedido.")
@@ -103,7 +117,7 @@ export default function ConfirmationPage() {
     }
 
     getOrderData()
-  }, [searchParams])
+  }, [searchParams, isFromCheckout])
 
   const copyOrderId = () => {
     if (orderId) {
@@ -123,10 +137,57 @@ export default function ConfirmationPage() {
   const shareOrder = async () => {
     if (orderId && navigator.share) {
       try {
+        // Crear un mensaje detallado con toda la información relevante del pedido
+        const shareTitle = "Confirmación de Pedido"
+
+        // Construir un mensaje completo con los detalles del pedido
+        let shareText = `¡Mi pedido #${orderId} ha sido confirmado!`
+
+        // Añadir detalles del pedido si están disponibles
+        if (order) {
+          // Información del cliente
+          shareText += `\n\nDatos del cliente:`
+          shareText += `\n• Nombre: ${order.customerInfo.name}`
+          shareText += `\n• Cédula: ${order.customerInfo.cedula || "No especificada"}`
+          shareText += `\n• Email: ${order.customerInfo.email}`
+          shareText += `\n• Teléfono: ${order.customerInfo.phone || "No especificado"}`
+
+          // Método de entrega
+          shareText += `\n\nMétodo de entrega: ${getDeliveryMethodText(order.customerInfo.deliveryMethod)}`
+          if (order.customerInfo.deliveryMethod === "mrw") {
+            shareText += `\n• Oficina MRW: ${order.customerInfo.mrwOffice}`
+          } else if (order.customerInfo.deliveryMethod === "delivery") {
+            shareText += `\n• Dirección: ${order.customerInfo.address}`
+          }
+
+          // Método de pago
+          shareText += `\n\nMétodo de pago: ${getPaymentMethodText(order.customerInfo.paymentMethod)}`
+
+          // Resumen de productos
+          shareText += `\n\nResumen del pedido:`
+          shareText += `\n• Total de artículos: ${order.items.length}`
+          // Remove the total amount from here
+
+          // Añadir lista de productos si no son demasiados
+          if (order.items.length <= 5) {
+            shareText += `\n\nProductos:`
+            order.items.forEach((item, index) => {
+              shareText += `\n${index + 1}. ${item.name} (${item.quantity}x) - $${(item.price * item.quantity).toFixed(2)}`
+            })
+          }
+
+          // Add the total amount at the bottom
+          shareText += `\n\nMonto total: $${order.total.toFixed(2)}`
+
+          // Añadir mensaje de agradecimiento
+          shareText += `\n\n¡Gracias por tu compra! Puedes hacer seguimiento de tu pedido usando el número de orden.`
+        }
+
         await navigator.share({
-          title: "Mi Pedido",
-          text: `Mi ID de pedido es: ${orderId}. Por favor procesa mi pedido.`,
+          title: shareTitle,
+          text: shareText,
         })
+
         toast({
           title: "Compartido exitosamente",
           description: "Los detalles de tu pedido han sido compartidos",
@@ -134,13 +195,24 @@ export default function ConfirmationPage() {
         })
       } catch (error) {
         console.error("Error sharing:", error)
+
+        // Proporcionar mejor manejo de errores con retroalimentación al usuario
+        if (error instanceof Error && error.name !== "AbortError") {
+          toast({
+            title: "Error al compartir",
+            description: "No se pudieron compartir los detalles de tu pedido. Puedes copiar el ID en su lugar.",
+            variant: "destructive",
+            duration: 3000,
+          })
+        }
       }
     } else {
       copyOrderId()
     }
   }
 
-  if (loading) {
+  // Usar el mismo estilo de overlay de carga que en la página de checkout
+  if (loading || isFromCheckout) {
     return (
       <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
