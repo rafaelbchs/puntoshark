@@ -270,7 +270,7 @@ export default function ConfirmationPage() {
     // Use the regular WhatsApp link format with the phone number
     // Replace PHONE_NUMBER with your actual phone number (include country code, no + or spaces)
     // For example, for +1 (555) 123-4567, use 15551234567
-    const phoneNumber = "584246142326" // Replace with your actual phone number
+    const phoneNumber = "584246303476" // Replace with your actual phone number
 
     // Encode the message for the URL
     const encodedMessage = encodeURIComponent(messageText)
