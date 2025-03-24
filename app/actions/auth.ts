@@ -4,12 +4,13 @@ import { cookies } from "next/headers"
 import { SignJWT, jwtVerify } from "jose"
 import { getServiceSupabase } from "@/lib/supabase"
 import bcrypt from "bcryptjs"
+import type { AuthResult } from "@/types/auth"
 
 // Secret key for JWT
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "fallback_secret_key_for_development_only")
 
 // Admin login
-export async function adminLogin(username, password) {
+export async function adminLogin(username: string, password: string): Promise<AuthResult> {
   try {
     const supabase = getServiceSupabase()
 
@@ -62,13 +63,13 @@ export async function adminLogin(username, password) {
 }
 
 // Admin logout
-export async function adminLogout() {
+export async function adminLogout(): Promise<AuthResult> {
   cookies().delete("admin_token")
   return { success: true }
 }
 
 // Verify admin token
-export async function verifyAdminToken() {
+export async function verifyAdminToken(): Promise<AuthResult> {
   try {
     const token = cookies().get("admin_token")?.value
 
@@ -81,9 +82,9 @@ export async function verifyAdminToken() {
     return {
       success: true,
       admin: {
-        id: payload.id,
-        username: payload.username,
-        role: payload.role,
+        id: payload.id as string,
+        username: payload.username as string,
+        role: payload.role as string,
       },
     }
   } catch (error) {
