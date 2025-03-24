@@ -5,23 +5,29 @@ import { revalidateTag } from "next/cache"
 import type { Product } from "@/types/product"
 import { PRODUCTS_CACHE_TAG } from "@/lib/constants"
 
+// Modify the getProductsFromDatabase function to exclude discontinued products
 export async function getProductsFromDatabase(): Promise<Product[]> {
   try {
     console.log("Fetching products from database...")
     const supabase = getServiceSupabase()
 
     // Use fetch with cache tags for better control over caching
-    const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false })
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .neq("inventory_status", "discontinued") // Exclude discontinued products
+      .in("inventory_status", ["in_stock", "low_stock"]) // Only include available products
+      .order("created_at", { ascending: false })
 
     if (error) {
       console.error("Error fetching products:", error)
       return []
     }
 
-    console.log(`Found ${data?.length || 0} products in database`)
+    console.log(`Found ${data?.length || 0} active products in database (discontinued products filtered out)`)
 
     if (!data || data.length === 0) {
-      console.log("No products found in the database")
+      console.log("No active products found in the database")
       return []
     }
 

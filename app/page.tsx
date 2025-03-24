@@ -7,10 +7,11 @@ import { Suspense } from "react"
 async function ProductGrid() {
   const products = await getProductsFromDatabase()
 
+  // Log to confirm we're filtering out discontinued products
+  console.log("Products fetched for homepage:", products.length, "(discontinued products filtered out)")
+
   // Make sure we have a valid array
   const validProducts = Array.isArray(products) ? products : []
-
-  console.log("Products fetched for homepage:", validProducts.length)
 
   if (validProducts.length === 0) {
     return <p>No products available</p>

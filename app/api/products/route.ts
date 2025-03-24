@@ -1,3 +1,6 @@
+// Let's also check if there are any API routes that fetch products directly
+// This is a partial update to the existing file
+
 import { type NextRequest, NextResponse } from "next/server"
 import { getServiceSupabase } from "@/lib/supabase"
 
@@ -32,6 +35,11 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Failed to fetch product" }, { status: 500 })
       }
 
+      // Don't return discontinued products to customers
+      if (product.inventory_status === "discontinued") {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 })
+      }
+
       // Transform database model to application model
       const transformedProduct = {
         id: product.id,
@@ -59,7 +67,8 @@ export async function GET(request: NextRequest) {
       let query = supabase
         .from("products")
         .select("*")
-        .neq("inventory_status", "out_of_stock")
+        .neq("inventory_status", "discontinued") // Exclude discontinued products
+        .neq("inventory_status", "out_of_stock") // Also exclude out of stock products
         .order("name", { ascending: true })
         .range(from, to)
 
@@ -90,7 +99,8 @@ export async function GET(request: NextRequest) {
       const { count: totalCount, error: countError } = await supabase
         .from("products")
         .select("*", { count: "exact", head: true })
-        .eq("inventory_status", "in_stock")
+        .neq("inventory_status", "discontinued")
+        .neq("inventory_status", "out_of_stock")
 
       if (countError) {
         console.error("Error counting products:", countError)

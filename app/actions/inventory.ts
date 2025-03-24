@@ -11,10 +11,17 @@ import type { Partial } from "@/types/utils"
 const getSupabase = () => getServiceSupabase()
 
 // Get all products
-export async function getProducts(): Promise<Product[]> {
+export async function getProducts(includeDiscontinued = true): Promise<Product[]> {
   try {
     const supabase = getSupabase()
-    const { data, error } = await supabase.from("products").select("*").order("updated_at", { ascending: false })
+    let query = supabase.from("products").select("*").order("updated_at", { ascending: false })
+
+    // Filter out discontinued products if not explicitly included
+    if (!includeDiscontinued) {
+      query = query.neq("inventory_status", "discontinued")
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 
@@ -227,13 +234,34 @@ export async function deleteProduct(id: string): Promise<{ success: boolean; err
   try {
     const supabase = getSupabase()
 
+    // Check if the product is referenced in any orders
+    const { count, error: checkError } = await supabase
+      .from("order_items")
+      .select("*", { count: "exact", head: true })
+      .eq("product_id", id)
+
+    if (checkError) {
+      console.error("Error checking order items:", checkError)
+    }
+
+    // If product is used in orders, return an error
+    if (count && count > 0) {
+      return {
+        success: false,
+        error: "Cannot delete product that has been ordered. Consider marking it as discontinued instead.",
+      }
+    }
+
     // First delete related inventory logs
     await supabase.from("inventory_logs").delete().eq("product_id", id)
 
     // Then delete the product
     const { error } = await supabase.from("products").delete().eq("id", id)
 
-    if (error) throw error
+    if (error) {
+      console.error("Delete product error:", error)
+      return { success: false, error: error.message || "Failed to delete product" }
+    }
 
     // Revalidate paths and cache
     revalidatePath("/admin/products")
