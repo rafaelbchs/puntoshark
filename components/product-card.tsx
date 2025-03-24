@@ -5,6 +5,7 @@ import { useCart } from "@/context/cart-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card"
 import { toast } from "@/hooks/use-toast"
+import { getProductCardImageUrl } from "@/lib/image-utils"
 
 type ProductCardProps = {
   product: {
@@ -12,15 +13,29 @@ type ProductCardProps = {
     name: string
     price: number
     image?: string
+    images?: string[]
   }
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { id, name, price, image = "/placeholder.svg?height=200&width=200" } = product;
-  const { addItem } = useCart();
+  const { id, name, price } = product
+  // Use the first image from the images array, or the image prop, or a placeholder
+  const imageUrl = product.images?.length ? product.images[0] : product.image || "/placeholder.svg?height=200&width=200"
+
+  // Get optimized image URL
+  const optimizedImageUrl = getProductCardImageUrl(imageUrl)
+
+  console.log("Product card image:", imageUrl) // Add this log to debug
+
+  const { addItem } = useCart()
 
   const handleAddToCart = () => {
-    addItem({ id, name, price, image })
+    addItem({
+      id,
+      name,
+      price,
+      image: imageUrl,
+    })
     toast({
       title: "Added to cart",
       description: `${name} has been added to your cart`,
@@ -31,7 +46,13 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <Card className="overflow-hidden">
       <div className="relative h-48 w-full">
-        <Image src={image || "/placeholder.svg"} alt={name} fill className="object-cover" />
+        <Image
+          src={optimizedImageUrl || "/placeholder.svg"}
+          alt={name}
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        />
       </div>
       <CardContent className="p-4">
         <CardTitle className="line-clamp-1">{name}</CardTitle>
@@ -45,3 +66,4 @@ export function ProductCard({ product }: ProductCardProps) {
     </Card>
   )
 }
+
