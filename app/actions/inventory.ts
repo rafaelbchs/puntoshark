@@ -1,13 +1,18 @@
+// Change the file extension from .js to .ts
+// Add type imports at the top
 "use server"
 
 import { revalidatePath } from "next/cache"
 import { getServiceSupabase } from "@/lib/supabase"
+import type { Product, ProductStatus, InventoryUpdateLog } from "@/types/inventory"
+import type { Omit } from "@/types/utils"
+import type { Partial } from "@/types/utils"
 
 // Get Supabase admin client
 const getSupabase = () => getServiceSupabase()
 
 // Get all products
-export async function getProducts() {
+export async function getProducts(): Promise<Product[]> {
   try {
     const supabase = getSupabase()
     const { data, error } = await supabase.from("products").select("*").order("updated_at", { ascending: false })
@@ -43,7 +48,7 @@ export async function getProducts() {
 }
 
 // Get product by ID
-export async function getProductById(id) {
+export async function getProductById(id: string): Promise<Product | null> {
   try {
     const supabase = getSupabase()
     const { data, error } = await supabase.from("products").select("*").eq("id", id).single()
@@ -84,7 +89,7 @@ export async function getProductById(id) {
 }
 
 // Create a new product
-export async function createProduct(productData) {
+export async function createProduct(productData: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<{ success: boolean; product?: Product; error?: string }> {
   try {
     const supabase = getSupabase()
 
@@ -147,7 +152,7 @@ export async function createProduct(productData) {
 }
 
 // Update a product
-export async function updateProduct(id, productData) {
+export async function updateProduct(id: string, productData: Partial<Product>): Promise<{ success: boolean; product?: Product; error?: string }> {
   try {
     const supabase = getSupabase()
 
@@ -210,7 +215,7 @@ export async function updateProduct(id, productData) {
 }
 
 // Delete a product
-export async function deleteProduct(id) {
+export async function deleteProduct(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = getSupabase()
 
@@ -233,15 +238,15 @@ export async function deleteProduct(id) {
 
 // Update inventory quantity
 export async function updateInventory(
-  productId,
-  newQuantity,
-  reason,
-  orderId,
-  userId
-) {
+  productId: string,
+  newQuantity: number,
+  reason: string,
+  orderId?: string,
+  userId?: string
+): Promise<{ success: boolean; product?: Product; log?: InventoryUpdateLog; error?: string }> {
   try {
     const supabase = getSupabase()
-    
+        
     // Get current product
     const { data: product, error: productError } = await supabase
       .from("products")
@@ -343,7 +348,7 @@ export async function updateInventory(
 }
 
 // Helper function to determine product status based on quantity
-function determineProductStatus(quantity, lowStockThreshold) {
+function determineProductStatus(quantity: number, lowStockThreshold: number): ProductStatus {
   if (quantity <= 0) {
     return "out_of_stock"
   } else if (quantity <= lowStockThreshold) {
@@ -353,7 +358,7 @@ function determineProductStatus(quantity, lowStockThreshold) {
   }
 }
 
-export async function getInventoryLogs(productId) {
+export async function getInventoryLogs(productId?: string): Promise<InventoryUpdateLog[]> {
   try {
     const supabase = getSupabase()
     
@@ -386,3 +391,4 @@ export async function getInventoryLogs(productId) {
     throw error
   }
 }
+
