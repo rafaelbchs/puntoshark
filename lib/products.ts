@@ -1,24 +1,24 @@
 "use server"
 
 import { getServiceSupabase } from "@/lib/supabase"
+import { revalidateTag } from "next/cache"
 import type { Product } from "@/types/product"
+import { PRODUCTS_CACHE_TAG } from "@/lib/constants"
 
 export async function getProductsFromDatabase(): Promise<Product[]> {
   try {
     console.log("Fetching products from database...")
     const supabase = getServiceSupabase()
 
-    // Log the Supabase URL to verify connection (don't log the key!)
-    console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL)
-
-    const { data, error } = await supabase.from("products").select("*")
+    // Use fetch with cache tags for better control over caching
+    const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false })
 
     if (error) {
       console.error("Error fetching products:", error)
       return []
     }
 
-    console.log("Products data from database:", data)
+    console.log(`Found ${data?.length || 0} products in database`)
 
     if (!data || data.length === 0) {
       console.log("No products found in the database")
@@ -40,3 +40,10 @@ export async function getProductsFromDatabase(): Promise<Product[]> {
     return []
   }
 }
+
+// Function to revalidate product cache
+export async function revalidateProductCache() {
+  revalidateTag(PRODUCTS_CACHE_TAG)
+  console.log("Product cache revalidated")
+}
+

@@ -1,9 +1,8 @@
-// Change the file extension from .js to .ts
-// Add type imports at the top
 "use server"
 
 import { revalidatePath } from "next/cache"
 import { getServiceSupabase } from "@/lib/supabase"
+import { revalidateProductCache } from "@/lib/products"
 import type { Product, ProductStatus, InventoryUpdateLog } from "@/types/inventory"
 import type { Omit } from "@/types/utils"
 import type { Partial } from "@/types/utils"
@@ -89,7 +88,9 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 // Create a new product
-export async function createProduct(productData: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<{ success: boolean; product?: Product; error?: string }> {
+export async function createProduct(
+  productData: Omit<Product, "id" | "createdAt" | "updatedAt">,
+): Promise<{ success: boolean; product?: Product; error?: string }> {
   try {
     const supabase = getSupabase()
 
@@ -118,7 +119,9 @@ export async function createProduct(productData: Omit<Product, "id" | "createdAt
 
     if (error) throw error
 
+    // Revalidate paths and cache
     revalidatePath("/admin/products")
+    await revalidateProductCache() // Revalidate product cache
 
     // Transform database model to our application model
     return {
@@ -152,7 +155,10 @@ export async function createProduct(productData: Omit<Product, "id" | "createdAt
 }
 
 // Update a product
-export async function updateProduct(id: string, productData: Partial<Product>): Promise<{ success: boolean; product?: Product; error?: string }> {
+export async function updateProduct(
+  id: string,
+  productData: Partial<Product>,
+): Promise<{ success: boolean; product?: Product; error?: string }> {
   try {
     const supabase = getSupabase()
 
@@ -180,8 +186,10 @@ export async function updateProduct(id: string, productData: Partial<Product>): 
 
     if (error) throw error
 
+    // Revalidate paths and cache
     revalidatePath("/admin/products")
     revalidatePath(`/admin/products/${id}`)
+    await revalidateProductCache() // Revalidate product cache
 
     // Transform database model to our application model
     return {
@@ -227,7 +235,9 @@ export async function deleteProduct(id: string): Promise<{ success: boolean; err
 
     if (error) throw error
 
+    // Revalidate paths and cache
     revalidatePath("/admin/products")
+    await revalidateProductCache() // Revalidate product cache
 
     return { success: true }
   } catch (error) {
@@ -242,11 +252,11 @@ export async function updateInventory(
   newQuantity: number,
   reason: string,
   orderId?: string,
-  userId?: string
+  userId?: string,
 ): Promise<{ success: boolean; product?: Product; log?: InventoryUpdateLog; error?: string }> {
   try {
     const supabase = getSupabase()
-        
+
     // Get current product
     const { data: product, error: productError } = await supabase
       .from("products")
@@ -270,7 +280,7 @@ export async function updateInventory(
       .update({
         inventory_quantity: newQuantity,
         inventory_status: newStatus,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("id", productId)
       .select("*")
@@ -284,15 +294,17 @@ export async function updateInventory(
     // Create inventory log
     const { data: log, error: logError } = await supabase
       .from("inventory_logs")
-      .insert([{
-        product_id: productId,
-        previous_quantity: previousQuantity,
-        new_quantity: newQuantity,
-        reason,
-        order_id: orderId,
-        user_id: userId,
-        timestamp: new Date().toISOString()
-      }])
+      .insert([
+        {
+          product_id: productId,
+          previous_quantity: previousQuantity,
+          new_quantity: newQuantity,
+          reason,
+          order_id: orderId,
+          user_id: userId,
+          timestamp: new Date().toISOString(),
+        },
+      ])
       .select("*")
       .single()
 
@@ -301,10 +313,11 @@ export async function updateInventory(
       // Continue even if log creation fails
     }
 
-    // Revalidate paths
+    // Revalidate paths and cache
     revalidatePath("/admin/products")
     revalidatePath(`/admin/products/${productId}`)
     revalidatePath("/admin/inventory")
+    await revalidateProductCache() // Revalidate product cache
 
     // Transform database models to our application models
     return {
@@ -330,16 +343,18 @@ export async function updateInventory(
         createdAt: updatedProduct.created_at,
         updatedAt: updatedProduct.updated_at,
       },
-      log: log ? {
-        id: log.id,
-        productId: log.product_id,
-        previousQuantity: log.previous_quantity,
-        newQuantity: log.new_quantity,
-        reason: log.reason,
-        orderId: log.order_id || undefined,
-        userId: log.user_id || undefined,
-        timestamp: log.timestamp,
-      } : undefined,
+      log: log
+        ? {
+            id: log.id,
+            productId: log.product_id,
+            previousQuantity: log.previous_quantity,
+            newQuantity: log.new_quantity,
+            reason: log.reason,
+            orderId: log.order_id || undefined,
+            userId: log.user_id || undefined,
+            timestamp: log.timestamp,
+          }
+        : undefined,
     }
   } catch (error) {
     console.error("Failed to update inventory:", error)
@@ -361,18 +376,18 @@ function determineProductStatus(quantity: number, lowStockThreshold: number): Pr
 export async function getInventoryLogs(productId?: string): Promise<InventoryUpdateLog[]> {
   try {
     const supabase = getSupabase()
-    
+
     // Build the query
     let query = supabase.from("inventory_logs").select("*").order("timestamp", { ascending: false })
-    
+
     // Add filter if productId is provided
     if (productId) {
       query = query.eq("product_id", productId)
     }
-    
+
     // Execute the query
     const { data, error } = await query
-    
+
     if (error) throw error
 
     // Transform database models to our application models

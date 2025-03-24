@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast"
 import ProtectedAdminRoute from "@/components/protected-admin-route"
 import { useAdminAuth } from "@/context/admin-auth-context"
 import { LogOut, Plus, Edit, Trash2, AlertCircle } from "lucide-react"
+import { RevalidateButton } from "@/components/admin/revalidate-button" // Import the new component
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,24 +32,24 @@ export default function AdminProductsPage() {
   const { logout } = useAdminAuth()
 
   useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const productsData = await getProducts()
-        setProducts(productsData || [])
-      } catch (error) {
-        console.error("Failed to fetch products:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load products",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchProducts()
   }, [])
+
+  const fetchProducts = async () => {
+    try {
+      const productsData = await getProducts()
+      setProducts(productsData || [])
+      setLoading(false)
+    } catch (error) {
+      console.error("Failed to fetch products:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load products",
+        variant: "destructive",
+      })
+      setLoading(false)
+    }
+  }
 
   const handleDeleteClick = (productId: string) => {
     setProductToDelete(productId)
@@ -107,6 +108,7 @@ export default function AdminProductsPage() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Admin: Products</h1>
           <div className="flex gap-2">
+            <RevalidateButton /> {/* Add the revalidate button */}
             <Link href="/admin/products/new" passHref>
               <Button className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />

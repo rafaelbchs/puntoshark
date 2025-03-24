@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       let query = supabase
         .from("products")
         .select("*")
-        .eq("inventory_status", "in_stock") // Only show in-stock products
+        .neq("inventory_status", "out_of_stock")
         .order("name", { ascending: true })
         .range(from, to)
 
