@@ -267,11 +267,9 @@ export default function ConfirmationPage() {
       messageText += `\n\nMonto total: $${order.total.toFixed(2)}`
     }
 
-    // Encode the message for URL
-    const encodedMessage = encodeURIComponent(messageText)
-
-    // Open WhatsApp with the specific link and message
-    window.open(`https://wa.me/message/3O5MPVAHHE2CK1?text=${encodedMessage}`, "_blank")
+    // Open WhatsApp with the specific link - don't add text parameter
+    // Just open the business link directly
+    window.open(`https://wa.me/message/3O5MPVAHHE2CK1`, "_blank")
   }
 
   // Usar el mismo estilo de overlay de carga que en la página de checkout
@@ -337,7 +335,7 @@ export default function ConfirmationPage() {
                 >
                   <path d="M17.498 14.382c-.301-.15-1.767-.867-2.04-.966-.273-.101-.473-.15-.673.15-.2.3-.767.966-.94 1.164-.173.199-.347.223-.646.075-.3-.15-1.267-.465-2.414-1.485-.893-.795-1.494-1.781-1.67-2.079-.173-.3-.018-.461.13-.61.134-.133.3-.345.45-.52.149-.174.199-.3.299-.498.1-.2.05-.374-.025-.524-.075-.15-.672-1.62-.922-2.217-.24-.584-.487-.51-.672-.51-.172 0-.371-.025-.571-.025-.2 0-.523.074-.797.374-.273.3-1.045 1.02-1.045 2.488s1.07 2.887 1.22 3.086c.149.2 2.095 3.2 5.076 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.571-.347m-5.498-11.707c-2.757 0-5.112.968-7.075 2.92A9.847 9.847 0 0 0 2 13.685c0 1.846.478 3.553 1.406 5.087L2 24.001l5.429-1.43a9.953 9.953 0 0 0 4.571 1.106c2.756 0 5.112-.967 7.074-2.92a9.846 9.846 0 0 0 2.926-7.091c0-2.759-.986-5.112-2.926-7.06-1.962-1.952-4.317-2.92-7.074-2.92m0 19.662a8.327 8.327 0 0 1-4.341-1.203l-.308-.183-3.2.836.85-3.102-.2-.314a8.233 8.233 0 0 1-1.299-4.439c0-2.311.806-4.275 2.417-5.876a8.036 8.036 0 0 1 5.881-2.425c2.311 0 4.275.806 5.876 2.425a8.035 8.035 0 0 1 2.424 5.876 8.034 8.034 0 0 1-2.424 5.876 8.034 8.034 0 0 1-5.876 2.424" />
                 </svg>
-                Compartir por WhatsApp
+                Contactar por WhatsApp
               </Button>
             </div>
           </CardContent>
