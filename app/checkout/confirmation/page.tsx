@@ -40,6 +40,7 @@ export default function ConfirmationPage() {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [baseUrl, setBaseUrl] = useState("")
 
   // Verificar si venimos de un checkout exitoso
   const [isFromCheckout, setIsFromCheckout] = useState(() => {
@@ -50,6 +51,11 @@ export default function ConfirmationPage() {
   })
 
   useEffect(() => {
+    // Set the base URL for links
+    if (typeof window !== "undefined") {
+      setBaseUrl(window.location.origin)
+    }
+
     // Limpiar el indicador de checkout
     if (typeof window !== "undefined" && isFromCheckout) {
       sessionStorage.removeItem("checkoutSubmitting")
@@ -142,6 +148,10 @@ export default function ConfirmationPage() {
 
         // Construir un mensaje completo con los detalles del pedido
         let shareText = `¡Mi pedido #${orderId} ha sido confirmado!`
+
+        // Add the admin link to the order ID
+        const orderLink = `${baseUrl}/api/order-redirect/${orderId}`
+        shareText += `\nVer detalles del pedido: ${orderLink}`
 
         // Añadir detalles del pedido si están disponibles
         if (order) {
