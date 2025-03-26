@@ -345,7 +345,7 @@ export default function AdminOrderDetailPage() {
           </Link>
           <h1 className="text-3xl font-bold">Detalles del Pedido</h1>
 
-          {!editMode && (
+          {!editMode && order && (
             <Button variant="outline" onClick={toggleEditMode} className="ml-auto">
               Editar Productos
             </Button>
@@ -365,16 +365,20 @@ export default function AdminOrderDetailPage() {
         </div>
 
         {loading ? (
-          <p className="text-center py-8">Cargando detalles del pedido...</p>
+          <div className="flex justify-center items-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            <p className="ml-2">Cargando detalles del pedido...</p>
+          </div>
         ) : !order ? (
           <div className="text-center py-8">
             <h2 className="text-xl font-semibold mb-4">Pedido No Encontrado</h2>
+            <p className="text-muted-foreground mb-6">No se pudo encontrar el pedido solicitado.</p>
             <Button onClick={() => router.push("/admin/orders")}>Volver a Pedidos</Button>
           </div>
         ) : (
           <>
             {/* Prominent Order ID Display */}
-            <div className="bg-muted p-4 rounded-lg mb-6 flex items-center justify-between">
+            <div className="bg-muted p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <p className="text-sm text-muted-foreground">ID del Pedido</p>
                 <div className="flex items-center gap-2">
