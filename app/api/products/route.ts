@@ -1,6 +1,3 @@
-// Let's also check if there are any API routes that fetch products directly
-// This is a partial update to the existing file
-
 import { type NextRequest, NextResponse } from "next/server"
 import { getServiceSupabase } from "@/lib/supabase"
 

@@ -471,4 +471,5 @@ export async function updateOrderStatus(
   }
 }
 
+export type Order = OrderType
 

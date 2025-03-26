@@ -1,5 +1,3 @@
-// If you're using a client-side product grid component, let's update it too
-
 "use client"
 
 import { useState, useEffect } from "react"
