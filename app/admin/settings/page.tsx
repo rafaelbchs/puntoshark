@@ -243,7 +243,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-8">
+          <TabsList className="mb-8 flex w-full flex-wrap">
             <TabsTrigger value="store" className="flex items-center gap-2">
               <Store className="h-4 w-4" />
               Store
@@ -664,7 +664,7 @@ export default function SettingsPage() {
                             <FormItem>
                               <FormLabel>Order Confirmation Email Template</FormLabel>
                               <FormControl>
-                                <Textarea {...field} rows={10} className="font-mono text-sm" />
+                                <Textarea {...field} rows={10} className="font-mono text-sm h-[200px] sm:h-[300px]" />
                               </FormControl>
                               <FormDescription>
                                 HTML template for order confirmation emails. Use variables like [customerName],

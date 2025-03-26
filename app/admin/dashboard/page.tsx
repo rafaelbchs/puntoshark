@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { verifyAdminToken } from "@/app/actions/auth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Loader2, ShoppingBag, Package, BarChart3, Settings } from "lucide-react"
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
@@ -41,46 +41,54 @@ export default function AdminDashboard() {
     )
   }
 
+  const dashboardItems = [
+    {
+      title: "Orders",
+      description: "View and manage customer orders",
+      icon: ShoppingBag,
+      href: "/admin/orders",
+    },
+    {
+      title: "Products",
+      description: "Manage your store products",
+      icon: Package,
+      href: "/admin/products",
+    },
+    {
+      title: "Inventory",
+      description: "Manage product inventory",
+      icon: BarChart3,
+      href: "/admin/inventory",
+    },
+    {
+      title: "Settings",
+      description: "Configure store settings",
+      icon: Settings,
+      href: "/admin/settings",
+    },
+  ]
+
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="mb-8 text-3xl font-bold">Admin Dashboard</h1>
+    <div className="container mx-auto py-6 px-4 md:py-8">
+      <h1 className="text-2xl font-bold mb-6 md:text-3xl md:mb-8">Admin Dashboard</h1>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Products</CardTitle>
-            <CardDescription>Manage your store products</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => router.push("/admin/products")} className="w-full">
-              View Products
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Orders</CardTitle>
-            <CardDescription>View and manage customer orders</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => router.push("/admin/orders")} className="w-full">
-              View Orders
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Inventory</CardTitle>
-            <CardDescription>Manage product inventory</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => router.push("/admin/inventory")} className="w-full">
-              Manage Inventory
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {dashboardItems.map((item) => (
+          <Card key={item.title} className="overflow-hidden">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <item.icon className="h-5 w-5 text-primary" />
+                {item.title}
+              </CardTitle>
+              <CardDescription>{item.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => router.push(item.href)} className="w-full">
+                View {item.title}
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   )

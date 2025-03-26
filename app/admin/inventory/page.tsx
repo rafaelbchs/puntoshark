@@ -403,7 +403,7 @@ export default function AdminInventoryPage() {
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="Filter by status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -436,37 +436,69 @@ export default function AdminInventoryPage() {
                   </div>
                 ) : (
                   <>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {getCurrentPageProducts().map((product) => (
-                          <TableRow key={product.id}>
-                            <TableCell className="font-medium">{product.name}</TableCell>
-                            <TableCell>{product.sku}</TableCell>
-                            <TableCell>{product.inventory.quantity}</TableCell>
-                            <TableCell>{getStatusBadge(product.inventory.status)}</TableCell>
-                            <TableCell>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleAdjustClick(product)}
-                                disabled={!product.inventory.managed}
-                              >
-                                Adjust
-                              </Button>
-                            </TableCell>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="hidden sm:table-cell">Product</TableHead>
+                            <TableHead>SKU</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead className="hidden sm:table-cell">Status</TableHead>
+                            <TableHead>Actions</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {loading ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                Loading inventory...
+                              </TableCell>
+                            </TableRow>
+                          ) : filteredProducts.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center py-8">
+                                <h3 className="text-lg font-medium mb-2">No products found</h3>
+                                <p className="text-muted-foreground mb-4">
+                                  {productSearchQuery || statusFilter !== "all"
+                                    ? "No products match your search criteria"
+                                    : "You haven't added any products yet."}
+                                </p>
+                                {!productSearchQuery && statusFilter === "all" && (
+                                  <Link href="/admin/products/new" passHref>
+                                    <Button>Add Your First Product</Button>
+                                  </Link>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            getCurrentPageProducts().map((product) => (
+                              <TableRow key={product.id}>
+                                <TableCell className="hidden sm:table-cell font-medium">{product.name}</TableCell>
+                                <TableCell>
+                                  <div className="sm:hidden font-medium mb-1">{product.name}</div>
+                                  {product.sku}
+                                </TableCell>
+                                <TableCell>{product.inventory.quantity}</TableCell>
+                                <TableCell className="hidden sm:table-cell">
+                                  {getStatusBadge(product.inventory.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleAdjustClick(product)}
+                                    disabled={!product.inventory.managed}
+                                    className="w-full sm:w-auto"
+                                  >
+                                    Adjust
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
 
                     {/* Pagination */}
                     {productTotalPages > 1 && (
@@ -536,43 +568,70 @@ export default function AdminInventoryPage() {
                   </div>
                 ) : (
                   <>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Product</TableHead>
-                          <TableHead>Change</TableHead>
-                          <TableHead>Reason</TableHead>
-                          <TableHead>Order ID</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {getCurrentPageLogs().map((log) => {
-                          const product = products.find((p) => p.id === log.productId)
-                          const change = log.newQuantity - log.previousQuantity
-
-                          return (
-                            <TableRow key={log.id}>
-                              <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                              <TableCell>{product?.name || log.productId}</TableCell>
-                              <TableCell className={change >= 0 ? "text-green-600" : "text-red-600"}>
-                                {change >= 0 ? `+${change}` : change}
-                              </TableCell>
-                              <TableCell>{getReasonBadge(log.reason)}</TableCell>
-                              <TableCell>
-                                {log.orderId ? (
-                                  <Link href={`/admin/orders/${log.orderId}`} className="text-primary hover:underline">
-                                    {log.orderId}
-                                  </Link>
-                                ) : (
-                                  "-"
-                                )}
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead className="hidden sm:table-cell">Product</TableHead>
+                            <TableHead>Change</TableHead>
+                            <TableHead className="hidden sm:table-cell">Reason</TableHead>
+                            <TableHead className="hidden md:table-cell">Order ID</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {loading ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                Loading history...
                               </TableCell>
                             </TableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
+                          ) : filteredLogs.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center py-8">
+                                <h3 className="text-lg font-medium mb-2">No inventory changes found</h3>
+                                <p className="text-muted-foreground">
+                                  {logSearchQuery
+                                    ? "No history entries match your search criteria"
+                                    : "Inventory changes will be recorded here."}
+                                </p>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            getCurrentPageLogs().map((log) => {
+                              const product = products.find((p) => p.id === log.productId)
+                              const change = log.newQuantity - log.previousQuantity
+
+                              return (
+                                <TableRow key={log.id}>
+                                  <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                                  <TableCell className="hidden sm:table-cell">
+                                    {product?.name || log.productId}
+                                  </TableCell>
+                                  <TableCell className={change >= 0 ? "text-green-600" : "text-red-600"}>
+                                    <div className="sm:hidden text-xs mb-1">{product?.name || log.productId}</div>
+                                    {change >= 0 ? `+${change}` : change}
+                                  </TableCell>
+                                  <TableCell className="hidden sm:table-cell">{getReasonBadge(log.reason)}</TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    {log.orderId ? (
+                                      <Link
+                                        href={`/admin/orders/${log.orderId}`}
+                                        className="text-primary hover:underline"
+                                      >
+                                        {log.orderId}
+                                      </Link>
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
 
                     {/* Pagination */}
                     {logTotalPages > 1 && (

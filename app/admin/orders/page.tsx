@@ -300,7 +300,7 @@ export default function AdminOrdersPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by order ID, customer name, email..."
+                  placeholder="Search orders..."
                   className="pl-8"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -310,7 +310,7 @@ export default function AdminOrdersPage() {
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -333,78 +333,80 @@ export default function AdminOrdersPage() {
               </p>
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order ID</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {getCurrentPageOrders().map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.id}</TableCell>
-                        <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p>{order.customerInfo.name}</p>
-                            <p className="text-sm text-muted-foreground">{order.customerInfo.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>${order.total.toFixed(2)}</TableCell>
-                        {/* Update the Select component in the TableCell to disable it for completed/cancelled orders */}
-                        <TableCell>
-                          {order.status === "completed" || order.status === "cancelled" ? (
-                            <div className="flex items-center h-10 w-[130px] px-3 py-2 border rounded-md bg-muted">
-                              <span className="text-sm">
-                                {order.status === "completed" ? "Completed" : "Cancelled"}
-                              </span>
-                            </div>
-                          ) : (
-                            <Select
-                              value={order.status}
-                              onValueChange={(value) =>
-                                handleStatusChange(order.id, order.status, value as Order["status"])
-                              }
-                              disabled={changingOrderId === order.id}
-                            >
-                              <SelectTrigger className="w-[130px]">
-                                <SelectValue placeholder="Status">
-                                  {changingOrderId === order.id ? (
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                      <span>Updating...</span>
-                                    </div>
-                                  ) : (
-                                    order.status
-                                  )}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {/* Only show Pending option if current status is Pending */}
-                                {order.status === "pending" && <SelectItem value="pending">Pending</SelectItem>}
-                                <SelectItem value="processing">Processing</SelectItem>
-                                <SelectItem value="completed">Completed</SelectItem>
-                                <SelectItem value="cancelled">Cancelled</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Link href={`/admin/orders/${order.id}`} passHref>
-                            <Button variant="outline" size="sm">
-                              View Details
-                            </Button>
-                          </Link>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order ID</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="hidden sm:table-cell">Customer</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {getCurrentPageOrders().map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-medium max-w-[100px] truncate">{order.id}</TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {new Date(order.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            <div>
+                              <p>{order.customerInfo.name}</p>
+                              <p className="text-sm text-muted-foreground">{order.customerInfo.email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>${order.total.toFixed(2)}</TableCell>
+                          <TableCell>
+                            {order.status === "completed" || order.status === "cancelled" ? (
+                              <div className="flex items-center h-10 w-[100px] sm:w-[130px] px-3 py-2 border rounded-md bg-muted">
+                                <span className="text-sm truncate">
+                                  {order.status === "completed" ? "Completed" : "Cancelled"}
+                                </span>
+                              </div>
+                            ) : (
+                              <Select
+                                value={order.status}
+                                onValueChange={(value) =>
+                                  handleStatusChange(order.id, order.status, value as Order["status"])
+                                }
+                                disabled={changingOrderId === order.id}
+                              >
+                                <SelectTrigger className="w-[100px] sm:w-[130px]">
+                                  <SelectValue placeholder="Status">
+                                    {changingOrderId === order.id ? (
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                        <span className="truncate">Updating...</span>
+                                      </div>
+                                    ) : (
+                                      order.status
+                                    )}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {order.status === "pending" && <SelectItem value="pending">Pending</SelectItem>}
+                                  <SelectItem value="processing">Processing</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
+                                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Link href={`/admin/orders/${order.id}`} passHref>
+                              <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                                View
+                              </Button>
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
 
                 {/* Pagination */}
                 {totalPages > 1 && (

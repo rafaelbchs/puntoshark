@@ -173,10 +173,10 @@ export default function AdminProductsPage() {
   return (
     <ProtectedAdminRoute>
       <div className="container mx-auto py-10 px-4">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Admin: Products</h1>
-          <div className="flex gap-2">
-            <RevalidateButton /> {/* Add the revalidate button */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <h1 className="text-2xl font-bold md:text-3xl">Admin: Products</h1>
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <RevalidateButton />
             <Link href="/admin/products/new" passHref>
               <Button className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
@@ -208,48 +208,65 @@ export default function AdminProductsPage() {
                 </Link>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Inventory</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>{product.sku}</TableCell>
-                      <TableCell>${product.price.toFixed(2)}</TableCell>
-                      <TableCell>{product.inventory.quantity}</TableCell>
-                      <TableCell>{getStatusBadge(product.inventory.status)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Link href={`/admin/products/${product.id}`} passHref>
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                              <Edit className="h-4 w-4" />
-                              <span className="sr-only">Edit</span>
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteClick(product.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </div>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden sm:table-cell">SKU</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead className="hidden md:table-cell">Inventory</TableHead>
+                      <TableHead className="hidden sm:table-cell">Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {products.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8">
+                          <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                          <h3 className="text-lg font-medium mb-2">No products found</h3>
+                          <p className="text-muted-foreground mb-4">You haven't added any products yet.</p>
+                          <Link href="/admin/products/new" passHref>
+                            <Button>Add Your First Product</Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      products.map((product) => (
+                        <TableRow key={product.id}>
+                          <TableCell className="font-medium">{product.name}</TableCell>
+                          <TableCell className="hidden sm:table-cell">{product.sku}</TableCell>
+                          <TableCell>${product.price.toFixed(2)}</TableCell>
+                          <TableCell className="hidden md:table-cell">{product.inventory.quantity}</TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            {getStatusBadge(product.inventory.status)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Link href={`/admin/products/${product.id}`} passHref>
+                                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                  <Edit className="h-4 w-4" />
+                                  <span className="sr-only">Edit</span>
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteClick(product.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Delete</span>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

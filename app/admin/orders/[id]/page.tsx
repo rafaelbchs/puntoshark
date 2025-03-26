@@ -420,7 +420,10 @@ export default function AdminOrderDetailPage() {
                       <h3 className="font-medium mb-2">Artículos</h3>
                       <div className="space-y-4">
                         {(editMode ? editedOrder?.items : order.items).map((item) => (
-                          <div key={item.id} className="flex justify-between items-center">
+                          <div
+                            key={item.id}
+                            className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b pb-3"
+                          >
                             <div className="flex items-center gap-3">
                               {item.image && (
                                 <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-md border">
@@ -439,7 +442,7 @@ export default function AdminOrderDetailPage() {
                             </div>
 
                             {editMode ? (
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 mt-2 sm:mt-0">
                                 <div className="flex items-center border rounded-md">
                                   <Button
                                     variant="ghost"
@@ -493,9 +496,9 @@ export default function AdminOrderDetailPage() {
                     {editMode && (
                       <div className="pt-4 border-t">
                         <h3 className="font-medium mb-4">Añadir Producto</h3>
-                        <div className="flex gap-2">
-                          <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                            <SelectTrigger className="flex-1">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Select value={selectedProduct} onValueChange={setSelectedProduct} className="flex-1">
+                            <SelectTrigger>
                               <SelectValue placeholder="Seleccionar producto" />
                             </SelectTrigger>
                             <SelectContent>
@@ -507,7 +510,7 @@ export default function AdminOrderDetailPage() {
                             </SelectContent>
                           </Select>
 
-                          <div className="flex items-center border rounded-md">
+                          <div className="flex items-center border rounded-md mt-2 sm:mt-0">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -533,7 +536,7 @@ export default function AdminOrderDetailPage() {
                             </Button>
                           </div>
 
-                          <Button onClick={addProductToOrder} disabled={!selectedProduct}>
+                          <Button onClick={addProductToOrder} disabled={!selectedProduct} className="mt-2 sm:mt-0">
                             <Plus className="h-4 w-4 mr-2" />
                             Añadir
                           </Button>
