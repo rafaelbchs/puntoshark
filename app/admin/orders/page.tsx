@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { getOrders, updateOrderStatus } from "@/app/actions/checkout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -30,8 +29,8 @@ import {
 import ProtectedAdminRoute from "@/components/protected-admin-route"
 import { useAdminAuth } from "@/context/admin-auth-context"
 import { LogOut, Search, AlertTriangle, Filter } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 import type { Order } from "@/types/checkout"
-import { toast } from "@/components/ui/use-toast"
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -86,12 +85,33 @@ export default function AdminOrdersPage() {
 
   async function fetchOrders() {
     try {
-      const ordersData = await getOrders()
-      setOrders(ordersData || [])
-      setFilteredOrders(ordersData || [])
-      setTotalPages(Math.ceil((ordersData?.length || 0) / ordersPerPage))
+      setLoading(true)
+
+      // Use fetch API instead of the server action to avoid potential issues
+      const response = await fetch("/api/admin/orders")
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.orders) {
+        setOrders(data.orders)
+        setFilteredOrders(data.orders)
+        setTotalPages(Math.ceil(data.orders.length / ordersPerPage))
+      } else {
+        setOrders([])
+        setFilteredOrders([])
+        setTotalPages(1)
+      }
     } catch (error) {
       console.error("Failed to fetch orders:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load orders. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
@@ -152,13 +172,28 @@ export default function AdminOrdersPage() {
   async function confirmStatusChange(orderId: string, status: Order["status"]) {
     setChangingOrderId(orderId)
     try {
-      const result = await updateOrderStatus(orderId, status)
+      // Use fetch API to update the order status
+      const response = await fetch(`/api/admin/orders/${orderId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
       if (result.success) {
         // Update local state
         setOrders(orders.map((order) => (order.id === orderId ? { ...order, status } : order)))
-        setShowStatusConfirmation(false)
-        setPendingStatus(null)
-        setSelectedOrderId(null)
+        toast({
+          title: "Status Updated",
+          description: `Order status changed to ${status}`,
+        })
       } else {
         toast({
           title: "Error",
@@ -175,6 +210,9 @@ export default function AdminOrdersPage() {
       })
     } finally {
       setChangingOrderId(null)
+      setShowStatusConfirmation(false)
+      setPendingStatus(null)
+      setSelectedOrderId(null)
     }
   }
 

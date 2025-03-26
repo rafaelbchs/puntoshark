@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Execute query
-    const { data: orders, error: ordersError, count } = await query.count("exact")
+    const { data: orders, error: ordersError } = await query
 
     if (ordersError) {
       console.error("Error fetching orders:", ordersError)
