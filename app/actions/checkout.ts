@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 import { getServiceSupabase } from "@/lib/supabase"
 import { updateInventory } from "./inventory"
+import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, sendAdminOrderNotification } from "@/lib/email"
 import type {
   Order as OrderType,
   OrderStatus as OrderStatusType,
@@ -204,15 +205,6 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
 
     console.log("Server: Order created:", orderData)
 
-    // Clear cart after successful order
-    // No limpiamos el carrito aquí, lo haremos en el cliente después de la redirección
-    // cookies().set("cart", "[]")
-
-    // Revalidate relevant paths
-    revalidatePath("/cart")
-    revalidatePath("/checkout")
-    revalidatePath("/admin/orders")
-
     // Transform database model to our application model
     const orderForClient = {
       id: orderData.id,
@@ -242,9 +234,16 @@ export async function processCheckout(formData: FormData): Promise<CheckoutResul
       inventoryUpdated: orderData.inventory_updated,
     }
 
-    // Add this log to verify the data being sent to the client
-    console.log("Server: Order data for client:", orderForClient)
-    console.log("Server: Customer info:", orderForClient.customerInfo)
+    // Send order confirmation email
+    await sendOrderConfirmationEmail(orderForClient)
+
+    // Send notification to admin
+    await sendAdminOrderNotification(orderForClient)
+
+    // Revalidate relevant paths
+    revalidatePath("/cart")
+    revalidatePath("/checkout")
+    revalidatePath("/admin/orders")
 
     // At the end of the function, before returning the result
     console.log("Server: Checkout completed successfully. Order ID:", orderData.id)
@@ -391,9 +390,19 @@ export async function updateOrderStatus(
       return { success: false, error: "Pedido no encontrado" }
     }
 
-    // If status is changing to 'completed' and inventory hasn't been updated yet
+    // Check if order is already in a final state (completed or cancelled)
+    if (order.status === "completed" || order.status === "cancelled") {
+      return {
+        success: false,
+        error: `No se puede cambiar el estado del pedido porque ya está ${order.status === "completed" ? "completado" : "cancelado"}`,
+      }
+    }
+
+    // Handle inventory updates based on status changes
+
+    // Case 1: Moving to "completed" and inventory hasn't been updated yet
     if (status === "completed" && !order.inventory_updated) {
-      // Update inventory for each item in the order
+      // Update inventory for each item in the order (decrease inventory)
       for (const item of order.items) {
         // Get the product
         const { data: product, error: productError } = await supabase
@@ -417,6 +426,34 @@ export async function updateOrderStatus(
       await supabase.from("orders").update({ inventory_updated: true }).eq("id", id)
     }
 
+    // Case 2: Cancelling an order that was previously processed or completed
+    // This means we need to return items to inventory
+    else if (
+      status === "cancelled" &&
+      (order.status === "processing" || order.status === "completed") &&
+      order.inventory_updated
+    ) {
+      // Return items to inventory (increase inventory)
+      for (const item of order.items) {
+        // Get the product
+        const { data: product, error: productError } = await supabase
+          .from("products")
+          .select("*")
+          .eq("id", item.product_id)
+          .single()
+
+        if (productError) continue // Skip if product not found
+
+        if (product && product.inventory_managed) {
+          // Calculate new quantity (add items back to inventory)
+          const newQuantity = product.inventory_quantity + item.quantity
+
+          // Update inventory with "return" reason
+          await updateInventory(item.product_id, newQuantity, "return", id, userId)
+        }
+      }
+    }
+
     // Update order status
     const { data, error } = await supabase
       .from("orders")
@@ -437,33 +474,40 @@ export async function updateOrderStatus(
     revalidatePath(`/admin/orders/${id}`)
 
     // Transform database model to our application model
+    const updatedOrder = {
+      id: data.id,
+      items: data.items.map((item) => ({
+        id: item.product_id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image || undefined,
+      })),
+      total: data.total,
+      customerInfo: {
+        name: data.customer_name,
+        email: data.customer_email,
+        cedula: data.customer_cedula,
+        phone: data.customer_phone,
+        address: data.customer_address,
+        deliveryMethod: data.delivery_method,
+        paymentMethod: data.payment_method,
+        mrwOffice: data.mrw_office,
+      },
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      inventoryUpdated: data.inventory_updated,
+    }
+
+    // Send order status update email if enabled
+    if (status !== order.status) {
+      await sendOrderStatusUpdateEmail(updatedOrder)
+    }
+
     return {
       success: true,
-      order: {
-        id: data.id,
-        items: data.items.map((item) => ({
-          id: item.product_id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          image: item.image || undefined,
-        })),
-        total: data.total,
-        customerInfo: {
-          name: data.customer_name,
-          email: data.customer_email,
-          cedula: data.customer_cedula,
-          phone: data.customer_phone,
-          address: data.customer_address,
-          deliveryMethod: data.delivery_method,
-          paymentMethod: data.payment_method,
-          mrwOffice: data.mrw_office,
-        },
-        status: data.status,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        inventoryUpdated: data.inventory_updated,
-      },
+      order: updatedOrder,
     }
   } catch (error) {
     console.error("Failed to update order status:", error)
