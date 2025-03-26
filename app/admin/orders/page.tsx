@@ -31,6 +31,7 @@ import ProtectedAdminRoute from "@/components/protected-admin-route"
 import { useAdminAuth } from "@/context/admin-auth-context"
 import { LogOut, Search, AlertTriangle, Filter } from "lucide-react"
 import type { Order } from "@/types/checkout"
+import { toast } from "@/components/ui/use-toast"
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -48,6 +49,8 @@ export default function AdminOrdersPage() {
     message: string
   }>({ type: "none", message: "" })
   const { logout } = useAdminAuth()
+  // Add a loading state for status changes
+  const [changingOrderId, setChangingOrderId] = useState<string | null>(null)
 
   const ordersPerPage = 10
 
@@ -126,7 +129,10 @@ export default function AdminOrdersPage() {
     return { type: "none", message: "No inventory changes will occur." }
   }
 
+  // Update the handleStatusChange function to include loading state
   async function handleStatusChange(orderId: string, currentStatus: string, newStatus: Order["status"]) {
+    if (changingOrderId) return // Prevent multiple simultaneous status changes
+
     // Calculate inventory impact
     const impact = calculateInventoryImpact(currentStatus, newStatus)
     setInventoryImpact(impact)
@@ -142,7 +148,9 @@ export default function AdminOrdersPage() {
     }
   }
 
+  // Update the confirmStatusChange function to include loading state
   async function confirmStatusChange(orderId: string, status: Order["status"]) {
+    setChangingOrderId(orderId)
     try {
       const result = await updateOrderStatus(orderId, status)
       if (result.success) {
@@ -151,9 +159,22 @@ export default function AdminOrdersPage() {
         setShowStatusConfirmation(false)
         setPendingStatus(null)
         setSelectedOrderId(null)
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update order status",
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error("Failed to update order status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update order status",
+        variant: "destructive",
+      })
+    } finally {
+      setChangingOrderId(null)
     }
   }
 
@@ -297,23 +318,43 @@ export default function AdminOrdersPage() {
                           </div>
                         </TableCell>
                         <TableCell>${order.total.toFixed(2)}</TableCell>
+                        {/* Update the Select component in the TableCell to disable it for completed/cancelled orders */}
                         <TableCell>
-                          <Select
-                            value={order.status}
-                            onValueChange={(value) =>
-                              handleStatusChange(order.id, order.status, value as Order["status"])
-                            }
-                          >
-                            <SelectTrigger className="w-[130px]">
-                              <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="processing">Processing</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          {order.status === "completed" || order.status === "cancelled" ? (
+                            <div className="flex items-center h-10 w-[130px] px-3 py-2 border rounded-md bg-muted">
+                              <span className="text-sm">
+                                {order.status === "completed" ? "Completed" : "Cancelled"}
+                              </span>
+                            </div>
+                          ) : (
+                            <Select
+                              value={order.status}
+                              onValueChange={(value) =>
+                                handleStatusChange(order.id, order.status, value as Order["status"])
+                              }
+                              disabled={changingOrderId === order.id}
+                            >
+                              <SelectTrigger className="w-[130px]">
+                                <SelectValue placeholder="Status">
+                                  {changingOrderId === order.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                      <span>Updating...</span>
+                                    </div>
+                                  ) : (
+                                    order.status
+                                  )}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {/* Only show Pending option if current status is Pending */}
+                                {order.status === "pending" && <SelectItem value="pending">Pending</SelectItem>}
+                                <SelectItem value="processing">Processing</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Link href={`/admin/orders/${order.id}`} passHref>

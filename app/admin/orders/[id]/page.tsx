@@ -45,6 +45,8 @@ export default function AdminOrderDetailPage() {
     type: "increase" | "decrease" | "none"
     message: string
   }>({ type: "none", message: "" })
+  // Add a loading state for status changes
+  const [isStatusChanging, setIsStatusChanging] = useState(false)
 
   useEffect(() => {
     async function fetchOrder() {
@@ -104,8 +106,9 @@ export default function AdminOrderDetailPage() {
     return { type: "none", message: "No inventory changes will occur." }
   }
 
+  // Update the handleStatusChange function to include loading state
   async function handleStatusChange(status: Order["status"]) {
-    if (!order) return
+    if (!order || isStatusChanging) return
 
     // Calculate inventory impact
     const impact = calculateInventoryImpact(order.status, status)
@@ -121,9 +124,11 @@ export default function AdminOrderDetailPage() {
     }
   }
 
+  // Update the confirmStatusChange function to include loading state
   async function confirmStatusChange(status: Order["status"]) {
     if (!order) return
 
+    setIsStatusChanging(true)
     try {
       const result = await updateOrderStatus(order.id, status)
       if (result.success) {
@@ -132,6 +137,12 @@ export default function AdminOrderDetailPage() {
           title: "Estado actualizado",
           description: `Estado del pedido cambiado a ${getStatusText(status)}`,
           duration: 2000,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "No se pudo actualizar el estado del pedido",
+          variant: "destructive",
         })
       }
     } catch (error) {
@@ -142,6 +153,7 @@ export default function AdminOrderDetailPage() {
         variant: "destructive",
       })
     } finally {
+      setIsStatusChanging(false)
       setShowStatusConfirmation(false)
       setPendingStatus(null)
     }
@@ -318,6 +330,9 @@ export default function AdminOrderDetailPage() {
       })
     }
   }
+
+  // Check if order is in a final state (completed or cancelled)
+  const isOrderInFinalState = order?.status === "completed" || order?.status === "cancelled"
 
   return (
     <ProtectedAdminRoute>
@@ -567,21 +582,38 @@ export default function AdminOrderDetailPage() {
                     <CardTitle>Estado del Pedido</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Select
-                      value={order.status}
-                      onValueChange={(value) => handleStatusChange(value as Order["status"])}
-                      disabled={editMode}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Estado" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pendiente</SelectItem>
-                        <SelectItem value="processing">Procesando</SelectItem>
-                        <SelectItem value="completed">Completado</SelectItem>
-                        <SelectItem value="cancelled">Cancelado</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {/* Replace the Select component with conditional rendering based on order status */}
+                    {isOrderInFinalState ? (
+                      <div className="flex items-center h-10 w-[130px] px-3 py-2 border rounded-md bg-muted">
+                        <span className="text-sm">{getStatusText(order.status)}</span>
+                      </div>
+                    ) : (
+                      <Select
+                        value={order.status}
+                        onValueChange={(value) => handleStatusChange(value as Order["status"])}
+                        disabled={editMode || isStatusChanging}
+                      >
+                        <SelectTrigger className="w-[130px]">
+                          <SelectValue placeholder="Estado">
+                            {isStatusChanging ? (
+                              <div className="flex items-center gap-2">
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                <span>Actualizando...</span>
+                              </div>
+                            ) : (
+                              getStatusText(order.status)
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Only show Pending option if current status is Pending */}
+                          {order.status === "pending" && <SelectItem value="pending">Pendiente</SelectItem>}
+                          <SelectItem value="processing">Procesando</SelectItem>
+                          <SelectItem value="completed">Completado</SelectItem>
+                          <SelectItem value="cancelled">Cancelado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
 
                     {/* Inventory status information */}
                     <div className="mt-4 p-3 bg-muted rounded-md text-sm">
@@ -606,7 +638,7 @@ export default function AdminOrderDetailPage() {
                         </p>
                       )}
 
-                      {(order.status === "processing" || order.status === "completed") && (
+                      {(order.status === "processing" || order.status === "completed") && !isOrderInFinalState && (
                         <p className="mt-2">
                           <AlertTriangle className="h-4 w-4 inline-block mr-1 text-yellow-600" />
                           Al cambiar a "Cancelado", se devolverán los productos al inventario.
