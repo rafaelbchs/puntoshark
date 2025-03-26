@@ -1,4 +1,3 @@
-// This file replaces the NextAuth configuration with our custom JWT auth functions
 import { cookies } from "next/headers"
 import { SignJWT, jwtVerify } from "jose"
 import { getServiceSupabase } from "./supabase"
