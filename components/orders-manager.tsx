@@ -1,115 +1,132 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Eye, ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Eye, CheckCircle, XCircle } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { getOrders } from "@/app/actions/checkout"
+import type { Order } from "@/types/checkout"
 
-type Order = {
-  id: string
-  customerId: string
-  customerName: string
-  customerEmail: string
-  status: "pending" | "processing" | "completed" | "cancelled"
-  total: number
-  items: OrderItem[]
-  createdAt: string
+interface OrdersManagerProps {
+  filter?: "all" | "pending" | "processing" | "completed" | "cancelled"
 }
 
-type OrderItem = {
-  id: string
-  productId: string
-  name: string
-  price: number
-  quantity: number
-}
-
-export default function OrdersManager() {
+export default function OrdersManager({ filter = "all" }: OrdersManagerProps) {
+  const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const { toast } = useToast()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [sortField, setSortField] = useState<"date" | "total" | "status">("date")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
 
   useEffect(() => {
-    fetchOrders()
+    async function loadOrders() {
+      try {
+        setLoading(true)
+        const allOrders = await getOrders()
+        setOrders(allOrders || [])
+      } catch (error) {
+        console.error("Failed to load orders:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadOrders()
   }, [])
 
-  const fetchOrders = async () => {
-    try {
-      const response = await fetch("/api/admin/orders")
-      const data = await response.json()
-      setOrders(data)
-      setLoading(false)
-    } catch (error) {
-      console.error("Error fetching orders:", error)
-      setLoading(false)
+  // Filter orders based on the selected tab
+  const filteredOrders = orders.filter((order) => {
+    // Apply status filter
+    if (filter !== "all" && order.status !== filter) {
+      return false
+    }
+
+    // Apply search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      return (
+        order.id.toLowerCase().includes(searchLower) ||
+        order.customerInfo.name.toLowerCase().includes(searchLower) ||
+        order.customerInfo.email.toLowerCase().includes(searchLower) ||
+        order.customerInfo.cedula?.toLowerCase().includes(searchLower) ||
+        order.customerInfo.phone?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    return true
+  })
+
+  // Sort orders
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (sortField === "date") {
+      return sortDirection === "asc"
+        ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    } else if (sortField === "total") {
+      return sortDirection === "asc" ? a.total - b.total : b.total - a.total
+    } else if (sortField === "status") {
+      const statusOrder = { pending: 0, processing: 1, completed: 2, cancelled: 3 }
+      return sortDirection === "asc"
+        ? statusOrder[a.status as keyof typeof statusOrder] - statusOrder[b.status as keyof typeof statusOrder]
+        : statusOrder[b.status as keyof typeof statusOrder] - statusOrder[a.status as keyof typeof statusOrder]
+    }
+    return 0
+  })
+
+  // Pagination
+  const totalPages = Math.ceil(sortedOrders.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedOrders = sortedOrders.slice(startIndex, startIndex + itemsPerPage)
+
+  const handleSort = (field: "date" | "total" | "status") => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      setSortField(field)
+      setSortDirection("desc")
     }
   }
 
-  const updateOrderStatus = async (orderId: string, status: "processing" | "completed" | "cancelled") => {
-    try {
-      const response = await fetch(`/api/admin/orders/${orderId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status }),
-      })
-
-      if (response.ok) {
-        toast({
-          title: "Order updated",
-          description: `Order status changed to ${status}`,
-        })
-        fetchOrders()
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to update order status",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error updating order status:", error)
-    }
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
 
-  const getStatusBadge = (status: string) => {
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(Number.parseInt(value))
+    setCurrentPage(1) // Reset to first page when changing items per page
+  }
+
+  // Helper function to translate status to Spanish and get badge color
+  function getStatusBadge(status: string) {
     switch (status) {
       case "pending":
         return (
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-            Pending
+          <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+            Pendiente
           </Badge>
         )
       case "processing":
         return (
-          <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-            Processing
+          <Badge variant="outline" className="bg-blue-100 text-blue-800">
+            Procesando
           </Badge>
         )
       case "completed":
         return (
-          <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">
-            Completed
+          <Badge variant="outline" className="bg-green-100 text-green-800">
+            Completado
           </Badge>
         )
       case "cancelled":
         return (
-          <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">
-            Cancelled
+          <Badge variant="outline" className="bg-red-100 text-red-800">
+            Cancelado
           </Badge>
         )
       default:
@@ -117,165 +134,159 @@ export default function OrdersManager() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+  // Format date to local string
+  function formatDate(dateString: string) {
+    const date = new Date(dateString)
+    return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }
 
   if (loading) {
     return (
-      <div className="text-center py-10">
-        <RefreshCw className="animate-spin h-8 w-8 mx-auto mb-4" />
-        <p>Loading orders...</p>
+      <div className="flex justify-center items-center py-12">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        <p className="ml-2">Cargando pedidos...</p>
       </div>
     )
   }
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold mb-6">Customer Orders</h2>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="relative w-full sm:w-auto">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Buscar por ID, nombre, email..."
+            className="pl-8 w-full sm:w-[300px]"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Pedidos por página" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="5">5 por página</SelectItem>
+            <SelectItem value="10">10 por página</SelectItem>
+            <SelectItem value="20">20 por página</SelectItem>
+            <SelectItem value="50">50 por página</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    No orders found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                orders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.id.substring(0, 8)}</TableCell>
-                    <TableCell>{order.customerName}</TableCell>
-                    <TableCell>{formatDate(order.createdAt)}</TableCell>
-                    <TableCell>${order.total.toFixed(2)}</TableCell>
-                    <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="icon" onClick={() => setSelectedOrder(order)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-[600px]">
-                            <DialogHeader>
-                              <DialogTitle>Order Details</DialogTitle>
-                            </DialogHeader>
-                            {selectedOrder && (
-                              <div className="space-y-6 py-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <h3 className="font-semibold mb-2">Order Information</h3>
-                                    <p>Order ID: {selectedOrder.id}</p>
-                                    <p>Date: {formatDate(selectedOrder.createdAt)}</p>
-                                    <p>Status: {selectedOrder.status}</p>
-                                    <p>Total: ${selectedOrder.total.toFixed(2)}</p>
-                                  </div>
-                                  <div>
-                                    <h3 className="font-semibold mb-2">Customer Information</h3>
-                                    <p>Name: {selectedOrder.customerName}</p>
-                                    <p>Email: {selectedOrder.customerEmail}</p>
-                                  </div>
-                                </div>
+      {filteredOrders.length === 0 ? (
+        <div className="text-center py-8">
+          <h3 className="text-lg font-medium">No hay pedidos</h3>
+          <p className="text-muted-foreground mt-1">
+            {searchTerm
+              ? "No se encontraron pedidos que coincidan con tu búsqueda."
+              : "No hay pedidos disponibles en esta categoría."}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-md border">
+            <div className="grid grid-cols-1 md:grid-cols-5 p-4 bg-muted/50">
+              <div className="font-medium">ID del Pedido</div>
+              <div className="font-medium">Cliente</div>
+              <div className="font-medium hidden md:block">Productos</div>
+              <div className="font-medium flex items-center cursor-pointer" onClick={() => handleSort("total")}>
+                Total
+                <ArrowUpDown className="ml-2 h-4 w-4" />
+              </div>
+              <div className="font-medium flex items-center cursor-pointer" onClick={() => handleSort("date")}>
+                Fecha
+                <ArrowUpDown className="ml-2 h-4 w-4" />
+              </div>
+            </div>
 
-                                <div>
-                                  <h3 className="font-semibold mb-2">Order Items</h3>
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead>Product</TableHead>
-                                        <TableHead>Price</TableHead>
-                                        <TableHead>Quantity</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {selectedOrder.items.map((item) => (
-                                        <TableRow key={item.id}>
-                                          <TableCell>{item.name}</TableCell>
-                                          <TableCell>${item.price.toFixed(2)}</TableCell>
-                                          <TableCell>{item.quantity}</TableCell>
-                                          <TableCell className="text-right">
-                                            ${(item.price * item.quantity).toFixed(2)}
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </div>
+            {paginatedOrders.map((order) => (
+              <div
+                key={order.id}
+                className="grid grid-cols-1 md:grid-cols-5 p-4 border-t hover:bg-muted/50 cursor-pointer"
+                onClick={() => router.push(`/admin/orders/${order.id}`)}
+              >
+                <div className="flex flex-col">
+                  <span className="font-mono text-sm">{order.id}</span>
+                  <span className="md:hidden mt-1">{getStatusBadge(order.status)}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span>{order.customerInfo.name}</span>
+                  <span className="text-sm text-muted-foreground">{order.customerInfo.email}</span>
+                </div>
+                <div className="hidden md:flex items-center">
+                  <span>{order.items.length} productos</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="font-medium">${order.total.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span>{formatDate(order.createdAt)}</span>
+                    <span className="hidden md:inline-block mt-1">{getStatusBadge(order.status)}</span>
+                  </div>
+                  <Button variant="ghost" size="icon" className="ml-auto">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
 
-                                <div className="flex justify-between items-center">
-                                  <h3 className="font-semibold">Update Status</h3>
-                                  <div className="flex gap-2">
-                                    {selectedOrder.status !== "processing" && (
-                                      <Button
-                                        variant="outline"
-                                        onClick={() => updateOrderStatus(selectedOrder.id, "processing")}
-                                      >
-                                        Mark as Processing
-                                      </Button>
-                                    )}
-                                    {selectedOrder.status !== "completed" && (
-                                      <Button
-                                        variant="outline"
-                                        className="text-green-600"
-                                        onClick={() => updateOrderStatus(selectedOrder.id, "completed")}
-                                      >
-                                        <CheckCircle className="h-4 w-4 mr-2" />
-                                        Complete
-                                      </Button>
-                                    )}
-                                    {selectedOrder.status !== "cancelled" && (
-                                      <Button
-                                        variant="outline"
-                                        className="text-red-600"
-                                        onClick={() => updateOrderStatus(selectedOrder.id, "cancelled")}
-                                      >
-                                        <XCircle className="h-4 w-4 mr-2" />
-                                        Cancel
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            <DialogFooter>
-                              <DialogClose asChild>
-                                <Button type="button" variant="outline">
-                                  Close
-                                </Button>
-                              </DialogClose>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {startIndex + 1}-{Math.min(startIndex + itemsPerPage, sortedOrders.length)} de{" "}
+                {sortedOrders.length} pedidos
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  // Show pages around current page
+                  let pageToShow
+                  if (totalPages <= 5) {
+                    pageToShow = i + 1
+                  } else if (currentPage <= 3) {
+                    pageToShow = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageToShow = totalPages - 4 + i
+                  } else {
+                    pageToShow = currentPage - 2 + i
+                  }
+
+                  return (
+                    <Button
+                      key={i}
+                      variant={currentPage === pageToShow ? "default" : "outline"}
+                      size="icon"
+                      onClick={() => handlePageChange(pageToShow)}
+                    >
+                      {pageToShow}
+                    </Button>
+                  )
+                })}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

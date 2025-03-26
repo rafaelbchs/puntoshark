@@ -54,7 +54,6 @@ export default function AdminOrderDetailPage() {
         setLoading(true)
         setError(null)
 
-        // Use the direct function call instead of destructuring the result
         const orderData = await getOrderById(orderId)
 
         if (orderData) {

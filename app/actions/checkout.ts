@@ -315,7 +315,7 @@ export async function getOrders(): Promise<OrderType[]> {
 }
 
 // Get order by ID
-export async function getOrderById(id: string): Promise<Order | null> {
+export async function getOrderById(id: string): Promise<OrderType | null> {
   try {
     const supabase = getSupabase()
 
@@ -364,7 +364,7 @@ export async function getOrderById(id: string): Promise<Order | null> {
     }
   } catch (error) {
     console.error("Failed to get order by ID:", error)
-    throw error
+    return null // Return null instead of throwing to prevent server component errors
   }
 }
 
