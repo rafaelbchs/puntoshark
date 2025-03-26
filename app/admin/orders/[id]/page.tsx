@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Copy, Plus, Minus, Trash, Save, AlertTriangle } from "lucide-react"
-import { getOrderById, updateOrderStatus } from "@/app/actions/checkout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -25,6 +24,7 @@ import {
 import { toast } from "@/hooks/use-toast"
 import ProtectedAdminRoute from "@/components/protected-admin-route"
 import { getProducts } from "@/app/actions/inventory"
+import { getOrderById, updateOrderStatus } from "@/app/actions/checkout"
 import type { Order, OrderItem } from "@/types/checkout"
 import type { Product } from "@/types/inventory"
 
@@ -34,6 +34,7 @@ export default function AdminOrderDetailPage() {
   const orderId = params.id as string
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [editedOrder, setEditedOrder] = useState<Order | null>(null)
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
@@ -45,17 +46,26 @@ export default function AdminOrderDetailPage() {
     type: "increase" | "decrease" | "none"
     message: string
   }>({ type: "none", message: "" })
-  // Add a loading state for status changes
   const [isStatusChanging, setIsStatusChanging] = useState(false)
 
   useEffect(() => {
     async function fetchOrder() {
       try {
+        setLoading(true)
+        setError(null)
+
+        // Use the direct function call instead of destructuring the result
         const orderData = await getOrderById(orderId)
-        setOrder(orderData || null)
-        setEditedOrder(orderData || null)
+
+        if (orderData) {
+          setOrder(orderData)
+          setEditedOrder(orderData)
+        } else {
+          setError("No se encontró el pedido")
+        }
       } catch (error) {
         console.error("Failed to fetch order:", error)
+        setError(error instanceof Error ? error.message : "Error al cargar el pedido")
       } finally {
         setLoading(false)
       }
@@ -106,7 +116,6 @@ export default function AdminOrderDetailPage() {
     return { type: "none", message: "No inventory changes will occur." }
   }
 
-  // Update the handleStatusChange function to include loading state
   async function handleStatusChange(status: Order["status"]) {
     if (!order || isStatusChanging) return
 
@@ -124,14 +133,14 @@ export default function AdminOrderDetailPage() {
     }
   }
 
-  // Update the confirmStatusChange function to include loading state
   async function confirmStatusChange(status: Order["status"]) {
     if (!order) return
 
     setIsStatusChanging(true)
     try {
-      const result = await updateOrderStatus(order.id, status)
-      if (result.success) {
+      const { success, error } = await updateOrderStatus(order.id, status)
+
+      if (success) {
         setOrder({ ...order, status })
         toast({
           title: "Estado actualizado",
@@ -141,7 +150,7 @@ export default function AdminOrderDetailPage() {
       } else {
         toast({
           title: "Error",
-          description: result.error || "No se pudo actualizar el estado del pedido",
+          description: error || "No se pudo actualizar el estado del pedido",
           variant: "destructive",
         })
       }
@@ -369,10 +378,10 @@ export default function AdminOrderDetailPage() {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
             <p className="ml-2">Cargando detalles del pedido...</p>
           </div>
-        ) : !order ? (
+        ) : error || !order ? (
           <div className="text-center py-8">
             <h2 className="text-xl font-semibold mb-4">Pedido No Encontrado</h2>
-            <p className="text-muted-foreground mb-6">No se pudo encontrar el pedido solicitado.</p>
+            <p className="text-muted-foreground mb-6">{error || "No se pudo encontrar el pedido solicitado."}</p>
             <Button onClick={() => router.push("/admin/orders")}>Volver a Pedidos</Button>
           </div>
         ) : (

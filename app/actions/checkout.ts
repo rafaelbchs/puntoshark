@@ -315,7 +315,7 @@ export async function getOrders(): Promise<OrderType[]> {
 }
 
 // Get order by ID
-export async function getOrderById(id: string): Promise<OrderType | null> {
+export async function getOrderById(id: string): Promise<Order | null> {
   try {
     const supabase = getSupabase()
 
@@ -329,9 +329,12 @@ export async function getOrderById(id: string): Promise<OrderType | null> {
       .single()
 
     if (error) {
+      console.error("Error fetching order:", error)
       if (error.code === "PGRST116") return null // No rows returned
       throw error
     }
+
+    if (!data) return null
 
     // Transform database model to our application model
     return {
