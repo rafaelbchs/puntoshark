@@ -344,14 +344,14 @@ export default function AdminOrderDetailPage() {
 
   return (
     <ProtectedAdminRoute>
-      <div className="container mx-auto py-10 px-4">
-        <div className="flex items-center gap-4 mb-8">
+      <div className="container mx-auto py-6 sm:py-10 px-4">
+        <div className="flex items-center gap-2 sm:gap-4 mb-4 sm:mb-8">
           <Link href="/admin/orders" passHref>
             <Button variant="outline" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold">Detalles del Pedido</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Detalles del Pedido</h1>
 
           {!editMode && order && (
             <Button variant="outline" onClick={toggleEditMode} className="ml-auto">
@@ -386,11 +386,11 @@ export default function AdminOrderDetailPage() {
         ) : (
           <>
             {/* Prominent Order ID Display */}
-            <div className="bg-muted p-4 rounded-lg mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="bg-muted p-3 sm:p-4 rounded-lg mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <p className="text-sm text-muted-foreground">ID del Pedido</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-xl font-mono font-bold tracking-wider">{order.id}</p>
+                  <p className="text-base sm:text-xl font-mono font-bold tracking-wider">{order.id}</p>
                   <button
                     onClick={copyOrderId}
                     className="p-1 rounded-md hover:bg-background transition-colors"
@@ -416,7 +416,7 @@ export default function AdminOrderDetailPage() {
               </Badge>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2 space-y-4">
                 <Card>
                   <CardHeader>

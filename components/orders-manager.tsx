@@ -163,7 +163,7 @@ export default function OrdersManager({ filter = "all" }: OrdersManagerProps) {
           />
         </div>
         <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Pedidos por página" />
           </SelectTrigger>
           <SelectContent>
@@ -236,7 +236,7 @@ export default function OrdersManager({ filter = "all" }: OrdersManagerProps) {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4">
               <div className="text-sm text-muted-foreground">
                 Mostrando {startIndex + 1}-{Math.min(startIndex + itemsPerPage, sortedOrders.length)} de{" "}
                 {sortedOrders.length} pedidos
@@ -269,11 +269,15 @@ export default function OrdersManager({ filter = "all" }: OrdersManagerProps) {
                       variant={currentPage === pageToShow ? "default" : "outline"}
                       size="icon"
                       onClick={() => handlePageChange(pageToShow)}
+                      className="hidden sm:inline-flex"
                     >
                       {pageToShow}
                     </Button>
                   )
                 })}
+                <span className="sm:hidden text-sm">
+                  Página {currentPage} de {totalPages}
+                </span>
                 <Button
                   variant="outline"
                   size="icon"

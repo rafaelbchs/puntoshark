@@ -8,13 +8,13 @@ import OrdersManager from "@/components/orders-manager"
 export default function AdminOrdersPage() {
   return (
     <ProtectedAdminRoute>
-      <div className="container mx-auto py-10">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold">Pedidos</h1>
+      <div className="container mx-auto py-6 sm:py-10 px-4">
+        <div className="flex items-center justify-between mb-4 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold">Pedidos</h1>
         </div>
 
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList>
+          <TabsList className="flex flex-wrap w-full">
             <TabsTrigger value="all">Todos</TabsTrigger>
             <TabsTrigger value="pending">Pendientes</TabsTrigger>
             <TabsTrigger value="processing">Procesando</TabsTrigger>
@@ -95,11 +95,11 @@ export default function AdminOrdersPage() {
 function OrdersManagerSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Skeleton className="h-9 w-[250px]" />
+          <Skeleton className="h-9 w-full sm:w-[250px]" />
         </div>
-        <Skeleton className="h-9 w-[100px]" />
+        <Skeleton className="h-9 w-full sm:w-[100px]" />
       </div>
       <div className="rounded-md border">
         <div className="p-4">
@@ -125,9 +125,9 @@ function OrdersManagerSkeleton() {
             </div>
           ))}
       </div>
-      <div className="flex items-center justify-end gap-2">
-        <Skeleton className="h-9 w-[100px]" />
-        <Skeleton className="h-9 w-[100px]" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
+        <Skeleton className="h-9 w-full sm:w-[100px]" />
+        <Skeleton className="h-9 w-full sm:w-[100px]" />
       </div>
     </div>
   )
