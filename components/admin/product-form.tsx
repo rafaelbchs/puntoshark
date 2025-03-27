@@ -4,10 +4,16 @@ import type React from "react"
 
 import { useState, useRef } from "react"
 import Image from "next/image"
-import { X, Loader2, GripVertical, ImagePlus } from "lucide-react"
+import { X, Loader2, GripVertical, ImagePlus, PlusCircle, Trash2, Pencil } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
-import { createProduct, updateProduct } from "@/app/actions/inventory"
+import {
+  createProduct,
+  updateProduct,
+  createProductVariant,
+  updateProductVariant,
+  deleteProductVariant,
+} from "@/app/actions/inventory"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -35,7 +41,19 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { getOptimizedImageUrl } from "@/lib/image-utils"
-import type { Product } from "@/types/inventory"
+import type { Product, ProductVariant, ProductType, ProductGender } from "@/types/inventory"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { getProductById } from "@/app/actions/inventory"
 
 type ProductFormProps = {
   product?: Product
@@ -96,12 +114,30 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
     sku: product?.sku || "",
     barcode: product?.barcode || "",
     category: product?.category || "",
+    subcategory: product?.subcategory || "",
+    productType: product?.productType || ("clothing" as ProductType),
+    gender: product?.gender || ("unisex" as ProductGender),
     tags: product?.tags?.join(", ") || "",
     inventoryQuantity: product?.inventory?.quantity || 0,
     lowStockThreshold: product?.inventory?.lowStockThreshold || 5,
     manageInventory: product?.inventory?.managed || true,
     images: product?.images || [],
+    hasVariants: product?.hasVariants || false,
+    variantAttributes: product?.variantAttributes || [],
   })
+
+  // Add state for variant management
+  const [variantFormOpen, setVariantFormOpen] = useState(false)
+  const [currentVariant, setCurrentVariant] = useState<ProductVariant | null>(null)
+  const [variantFormData, setVariantFormData] = useState({
+    sku: "",
+    price: 0,
+    compareAtPrice: 0,
+    inventoryQuantity: 0,
+    attributes: {} as Record<string, string>,
+  })
+  const [availableAttributes, setAvailableAttributes] = useState<string[]>([])
+  const [newAttribute, setNewAttribute] = useState("")
 
   // Set up DnD sensors
   const sensors = useSensors(
@@ -243,6 +279,200 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
     setFormData((prev) => ({ ...prev, [name]: checked }))
   }
 
+  // Add this function to handle variant attribute changes
+  const handleVariantAttributeChange = () => {
+    if (newAttribute && !formData.variantAttributes.includes(newAttribute)) {
+      setFormData((prev) => ({
+        ...prev,
+        variantAttributes: [...prev.variantAttributes, newAttribute],
+        hasVariants: true,
+      }))
+      setNewAttribute("")
+    }
+  }
+
+  // Add this function to remove a variant attribute
+  const removeVariantAttribute = (attribute: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      variantAttributes: prev.variantAttributes.filter((attr) => attr !== attribute),
+    }))
+  }
+
+  // Add these functions to handle variant management
+  const openVariantForm = (variant?: ProductVariant) => {
+    if (variant) {
+      setCurrentVariant(variant)
+      setVariantFormData({
+        sku: variant.sku,
+        price: variant.price || formData.price,
+        compareAtPrice: variant.compareAtPrice || 0,
+        inventoryQuantity: variant.inventory.quantity,
+        attributes: variant.attributes || {},
+      })
+    } else {
+      setCurrentVariant(null)
+      setVariantFormData({
+        sku: `${formData.sku}-${product?.variants?.length || 0 + 1}`,
+        price: formData.price,
+        compareAtPrice: formData.compareAtPrice,
+        inventoryQuantity: 0,
+        attributes: formData.variantAttributes.reduce(
+          (acc, attr) => {
+            acc[attr] = ""
+            return acc
+          },
+          {} as Record<string, string>,
+        ),
+      })
+    }
+    setVariantFormOpen(true)
+  }
+
+  const closeVariantForm = () => {
+    setVariantFormOpen(false)
+    setCurrentVariant(null)
+  }
+
+  const handleVariantFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setVariantFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleVariantAttributeValueChange = (attribute: string, value: string) => {
+    setVariantFormData((prev) => ({
+      ...prev,
+      attributes: {
+        ...prev.attributes,
+        [attribute]: value,
+      },
+    }))
+  }
+
+  const handleVariantSubmit = async () => {
+    if (!product?.id) return
+
+    try {
+      if (currentVariant) {
+        // Update existing variant
+        const result = await updateProductVariant(currentVariant.id, {
+          sku: variantFormData.sku,
+          price: variantFormData.price,
+          compareAtPrice: variantFormData.compareAtPrice || undefined,
+          inventory: {
+            quantity: variantFormData.inventoryQuantity,
+            lowStockThreshold: product.inventory.lowStockThreshold,
+            status: determineStatus(variantFormData.inventoryQuantity, product.inventory.lowStockThreshold),
+            managed: product.inventory.managed,
+          },
+          attributes: variantFormData.attributes,
+        })
+
+        if (result.success) {
+          toast({
+            title: "Success",
+            description: "Variant updated successfully",
+          })
+          closeVariantForm()
+          // Refresh the product data
+          const updatedProduct = await getProductById(product.id)
+          if (updatedProduct) {
+            setFormData((prev) => ({
+              ...prev,
+              hasVariants: true,
+            }))
+          }
+        } else {
+          toast({
+            title: "Error",
+            description: result.error || "Failed to update variant",
+            variant: "destructive",
+          })
+        }
+      } else {
+        // Create new variant
+        const result = await createProductVariant(product.id, {
+          sku: variantFormData.sku,
+          price: variantFormData.price,
+          compareAtPrice: variantFormData.compareAtPrice || undefined,
+          inventory: {
+            quantity: variantFormData.inventoryQuantity,
+            lowStockThreshold: product.inventory.lowStockThreshold,
+            status: determineStatus(variantFormData.inventoryQuantity, product.inventory.lowStockThreshold),
+            managed: product.inventory.managed,
+          },
+          attributes: variantFormData.attributes,
+          barcode: undefined,
+          images: [],
+        })
+
+        if (result.success) {
+          toast({
+            title: "Success",
+            description: "Variant created successfully",
+          })
+          closeVariantForm()
+          // Refresh the product data
+          const updatedProduct = await getProductById(product.id)
+          if (updatedProduct) {
+            setFormData((prev) => ({
+              ...prev,
+              hasVariants: true,
+            }))
+          }
+        } else {
+          toast({
+            title: "Error",
+            description: result.error || "Failed to create variant",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Failed to save variant:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteVariant = async (variantId: string) => {
+    if (!product?.id) return
+
+    try {
+      const result = await deleteProductVariant(variantId)
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Variant deleted successfully",
+        })
+        // Refresh the product data
+        const updatedProduct = await getProductById(product.id)
+        if (updatedProduct) {
+          setFormData((prev) => ({
+            ...prev,
+            hasVariants: updatedProduct.hasVariants || false,
+          }))
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to delete variant",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to delete variant:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -255,6 +485,9 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
         compareAtPrice: formData.compareAtPrice || undefined,
         images: formData.images, // This now includes the uploaded image URLs
         category: formData.category,
+        subcategory: formData.subcategory,
+        productType: formData.productType,
+        gender: formData.gender,
         tags: formData.tags
           .split(",")
           .map((tag) => tag.trim())
@@ -268,6 +501,8 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
           managed: formData.manageInventory,
         },
         attributes: product?.attributes || {},
+        hasVariants: formData.hasVariants,
+        variantAttributes: formData.variantAttributes,
       }
 
       let result
@@ -316,6 +551,7 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
           <TabsTrigger value="organization">Organization</TabsTrigger>
+          <TabsTrigger value="variants">Variants</TabsTrigger>
         </TabsList>
 
         <TabsContent value="basic">
@@ -502,9 +738,56 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
         <TabsContent value="organization">
           <Card>
             <CardContent className="pt-6 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Input id="category" name="category" value={formData.category} onChange={handleChange} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Input id="category" name="category" value={formData.category} onChange={handleChange} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="subcategory">Subcategory</Label>
+                  <Input id="subcategory" name="subcategory" value={formData.subcategory} onChange={handleChange} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="productType">Product Type</Label>
+                  <Select
+                    value={formData.productType}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, productType: value as ProductType }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select product type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="clothing">Clothing</SelectItem>
+                      <SelectItem value="accessories">Accessories</SelectItem>
+                      <SelectItem value="footwear">Footwear</SelectItem>
+                      <SelectItem value="home">Home</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender</Label>
+                  <Select
+                    value={formData.gender}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, gender: value as ProductGender }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="men">Men</SelectItem>
+                      <SelectItem value="women">Women</SelectItem>
+                      <SelectItem value="unisex">Unisex</SelectItem>
+                      <SelectItem value="kids">Kids</SelectItem>
+                      <SelectItem value="baby">Baby</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -520,6 +803,145 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="variants">
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label>Product Variants</Label>
+                  <Switch
+                    checked={formData.hasVariants}
+                    onCheckedChange={(checked) => {
+                      setFormData((prev) => ({ ...prev, hasVariants: checked }))
+                    }}
+                  />
+                </div>
+
+                {formData.hasVariants && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Variant Attributes</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Define the attributes that will create variants (e.g., Size, Color)
+                      </p>
+
+                      <div className="flex flex-wrap gap-2 my-2">
+                        {formData.variantAttributes.map((attr) => (
+                          <Badge key={attr} variant="secondary" className="px-2 py-1">
+                            {attr}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 ml-1"
+                              onClick={() => removeVariantAttribute(attr)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Add attribute (e.g., Size, Color)"
+                          value={newAttribute}
+                          onChange={(e) => setNewAttribute(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button type="button" onClick={handleVariantAttributeChange}>
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+
+                    {isEditing && product && product.id && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <Label>Manage Variants</Label>
+                          <Button
+                            type="button"
+                            onClick={() => openVariantForm()}
+                            disabled={formData.variantAttributes.length === 0}
+                          >
+                            <PlusCircle className="h-4 w-4 mr-2" />
+                            Add Variant
+                          </Button>
+                        </div>
+
+                        {product.variants && product.variants.length > 0 ? (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>SKU</TableHead>
+                                {formData.variantAttributes.map((attr) => (
+                                  <TableHead key={attr}>{attr}</TableHead>
+                                ))}
+                                <TableHead>Price</TableHead>
+                                <TableHead>Stock</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {product.variants.map((variant) => (
+                                <TableRow key={variant.id}>
+                                  <TableCell>{variant.sku}</TableCell>
+                                  {formData.variantAttributes.map((attr) => (
+                                    <TableCell key={attr}>{variant.attributes[attr] || "-"}</TableCell>
+                                  ))}
+                                  <TableCell>${variant.price || product.price}</TableCell>
+                                  <TableCell>{variant.inventory.quantity}</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openVariantForm(variant)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteVariant(variant.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <div className="text-center p-4 border rounded-md bg-muted/50">
+                            <p className="text-sm text-muted-foreground">No variants created yet.</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="mt-2"
+                              onClick={() => openVariantForm()}
+                              disabled={formData.variantAttributes.length === 0}
+                            >
+                              Create your first variant
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!isEditing && (
+                      <div className="text-center p-4 border rounded-md bg-muted/50">
+                        <p className="text-sm text-muted-foreground">You can add variants after saving the product.</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <div className="mt-6 flex justify-end gap-4">
@@ -530,6 +952,120 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
           {isSubmitting ? "Saving..." : isEditing ? "Update Product" : "Create Product"}
         </Button>
       </div>
+
+      {/* Variant Form Dialog */}
+      <Dialog open={variantFormOpen} onOpenChange={setVariantFormOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{currentVariant ? "Edit Variant" : "Add Variant"}</DialogTitle>
+            <DialogDescription>
+              {currentVariant
+                ? "Update the details for this product variant."
+                : "Create a new variant with specific attributes."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="variant-sku">SKU</Label>
+              <Input
+                id="variant-sku"
+                name="sku"
+                value={variantFormData.sku}
+                onChange={handleVariantFormChange}
+                required
+              />
+            </div>
+
+            {formData.variantAttributes.map((attr) => (
+              <div key={attr} className="space-y-2">
+                <Label htmlFor={`variant-attr-${attr}`}>{attr}</Label>
+                <Input
+                  id={`variant-attr-${attr}`}
+                  value={variantFormData.attributes[attr] || ""}
+                  onChange={(e) => handleVariantAttributeValueChange(attr, e.target.value)}
+                  placeholder={`Enter ${attr.toLowerCase()}`}
+                  required
+                />
+              </div>
+            ))}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="variant-price">Price</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5">$</span>
+                  <Input
+                    id="variant-price"
+                    name="price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={variantFormData.price}
+                    onChange={(e) =>
+                      setVariantFormData((prev) => ({
+                        ...prev,
+                        price: Number.parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                    className="pl-7"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="variant-compareAtPrice">Compare at Price</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5">$</span>
+                  <Input
+                    id="variant-compareAtPrice"
+                    name="compareAtPrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={variantFormData.compareAtPrice}
+                    onChange={(e) =>
+                      setVariantFormData((prev) => ({
+                        ...prev,
+                        compareAtPrice: Number.parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                    className="pl-7"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="variant-quantity">Inventory Quantity</Label>
+              <Input
+                id="variant-quantity"
+                name="inventoryQuantity"
+                type="number"
+                min="0"
+                value={variantFormData.inventoryQuantity}
+                onChange={(e) =>
+                  setVariantFormData((prev) => ({
+                    ...prev,
+                    inventoryQuantity: Number.parseInt(e.target.value) || 0,
+                  }))
+                }
+                required
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeVariantForm}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleVariantSubmit}>
+              {currentVariant ? "Update Variant" : "Add Variant"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   )
 }

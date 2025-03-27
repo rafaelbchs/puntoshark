@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { getServiceSupabase } from "@/lib/supabase"
 import { revalidateProductCache } from "@/lib/products"
-import type { Product, ProductStatus, InventoryUpdateLog } from "@/types/inventory"
+import type { Product, ProductStatus, InventoryUpdateLog, ProductVariant } from "@/types/inventory"
 import type { Omit } from "@/types/utils"
 import type { Partial } from "@/types/utils"
 
@@ -56,7 +56,316 @@ export async function getProducts(includeDiscontinued = true): Promise<Product[]
   }
 }
 
-// Get product by ID
+// Get product variants for a specific product
+export async function getProductVariants(productId: string): Promise<ProductVariant[]> {
+  try {
+    const supabase = getSupabase()
+    const { data, error } = await supabase
+      .from("product_variants")
+      .select("*")
+      .eq("product_id", productId)
+      .order("created_at", { ascending: true })
+
+    if (error) throw error
+
+    // Transform database model to our application model
+    return data.map((variant) => ({
+      id: variant.id,
+      productId: variant.product_id,
+      sku: variant.sku,
+      price: variant.price,
+      compareAtPrice: variant.compare_at_price || undefined,
+      inventory: {
+        quantity: variant.inventory_quantity,
+        lowStockThreshold: variant.low_stock_threshold,
+        status: variant.inventory_status,
+        managed: variant.inventory_managed,
+      },
+      attributes: variant.attributes || {},
+      barcode: variant.barcode || undefined,
+      images: variant.images || [],
+      createdAt: variant.created_at,
+      updatedAt: variant.updated_at,
+    }))
+  } catch (error) {
+    console.error("Failed to get product variants:", error)
+    throw error
+  }
+}
+
+// Create a product variant
+export async function createProductVariant(
+  productId: string,
+  variantData: Omit<ProductVariant, "id" | "productId" | "createdAt" | "updatedAt">,
+): Promise<{ success: boolean; variant?: ProductVariant; error?: string }> {
+  try {
+    const supabase = getSupabase()
+    const admin = await getCurrentAdmin()
+
+    // Check if product exists
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .select("id, name, has_variants")
+      .eq("id", productId)
+      .single()
+
+    if (productError) throw productError
+
+    // Update the product to indicate it has variants if not already set
+    if (!product.has_variants) {
+      await supabase.from("products").update({ has_variants: true }).eq("id", productId)
+    }
+
+    // Create the variant
+    const { data, error } = await supabase
+      .from("product_variants")
+      .insert([
+        {
+          product_id: productId,
+          sku: variantData.sku,
+          price: variantData.price,
+          compare_at_price: variantData.compareAtPrice,
+          inventory_quantity: variantData.inventory.quantity,
+          low_stock_threshold: variantData.inventory.lowStockThreshold,
+          inventory_status: variantData.inventory.status,
+          inventory_managed: variantData.inventory.managed,
+          attributes: variantData.attributes || {},
+          barcode: variantData.barcode,
+          images: variantData.images || [],
+        },
+      ])
+      .select("*")
+      .single()
+
+    if (error) throw error
+
+    // Log the variant creation
+    await supabase.from("inventory_logs").insert([
+      {
+        product_id: productId,
+        previous_quantity: 0,
+        new_quantity: data.inventory_quantity,
+        reason: "variant_created",
+        user_id: admin?.id,
+        admin_name: admin?.username,
+        details: `Variant "${data.sku}" created with initial inventory of ${data.inventory_quantity}`,
+        timestamp: new Date().toISOString(),
+      },
+    ])
+
+    // Revalidate paths and cache
+    revalidatePath("/admin/products")
+    revalidatePath(`/admin/products/${productId}`)
+    await revalidateProductCache()
+
+    // Transform database model to our application model
+    return {
+      success: true,
+      variant: {
+        id: data.id,
+        productId: data.product_id,
+        sku: data.sku,
+        price: data.price,
+        compareAtPrice: data.compare_at_price || undefined,
+        inventory: {
+          quantity: data.inventory_quantity,
+          lowStockThreshold: data.low_stock_threshold,
+          status: data.inventory_status,
+          managed: data.inventory_managed,
+        },
+        attributes: data.attributes || {},
+        barcode: data.barcode || undefined,
+        images: data.images || [],
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      },
+    }
+  } catch (error) {
+    console.error("Failed to create product variant:", error)
+    return { success: false, error: "Failed to create product variant" }
+  }
+}
+
+// Update a product variant
+export async function updateProductVariant(
+  variantId: string,
+  variantData: Partial<ProductVariant>,
+): Promise<{ success: boolean; variant?: ProductVariant; error?: string }> {
+  try {
+    const supabase = getSupabase()
+    const admin = await getCurrentAdmin()
+
+    // Get the current variant state to compare changes
+    const { data: currentVariant, error: fetchError } = await supabase
+      .from("product_variants")
+      .select("*, products!inner(name)")
+      .eq("id", variantId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    // Prepare update data
+    const updateData: any = {}
+    if (variantData.sku !== undefined) updateData.sku = variantData.sku
+    if (variantData.price !== undefined) updateData.price = variantData.price
+    if (variantData.compareAtPrice !== undefined) updateData.compare_at_price = variantData.compareAtPrice
+    if (variantData.inventory?.quantity !== undefined) updateData.inventory_quantity = variantData.inventory.quantity
+    if (variantData.inventory?.lowStockThreshold !== undefined)
+      updateData.low_stock_threshold = variantData.inventory.lowStockThreshold
+    if (variantData.inventory?.managed !== undefined) updateData.inventory_managed = variantData.inventory.managed
+    if (variantData.inventory?.status !== undefined) updateData.inventory_status = variantData.inventory.status
+    if (variantData.attributes !== undefined) updateData.attributes = variantData.attributes
+    if (variantData.barcode !== undefined) updateData.barcode = variantData.barcode
+    if (variantData.images !== undefined) updateData.images = variantData.images
+    updateData.updated_at = new Date().toISOString()
+
+    // Update the variant
+    const { data, error } = await supabase
+      .from("product_variants")
+      .update(updateData)
+      .eq("id", variantId)
+      .select("*")
+      .single()
+
+    if (error) throw error
+
+    // Generate details about what changed
+    const changes: string[] = []
+    if (currentVariant.sku !== data.sku) changes.push(`SKU changed from "${currentVariant.sku}" to "${data.sku}"`)
+    if (currentVariant.price !== data.price)
+      changes.push(`price changed from $${currentVariant.price} to $${data.price}`)
+    if (currentVariant.inventory_quantity !== data.inventory_quantity) {
+      changes.push(`inventory quantity changed from ${currentVariant.inventory_quantity} to ${data.inventory_quantity}`)
+    }
+
+    // Log the variant update if inventory changed
+    if (currentVariant.inventory_quantity !== data.inventory_quantity) {
+      await supabase.from("inventory_logs").insert([
+        {
+          product_id: currentVariant.product_id,
+          previous_quantity: currentVariant.inventory_quantity,
+          new_quantity: data.inventory_quantity,
+          reason: "variant_updated",
+          user_id: admin?.id,
+          admin_name: admin?.username,
+          details:
+            changes.length > 0
+              ? `Variant "${data.sku}" updated: ${changes.join(", ")}`
+              : `Variant "${data.sku}" updated with no significant changes`,
+          timestamp: new Date().toISOString(),
+        },
+      ])
+    }
+
+    // Revalidate paths and cache
+    revalidatePath("/admin/products")
+    revalidatePath(`/admin/products/${currentVariant.product_id}`)
+    await revalidateProductCache()
+
+    // Transform database model to our application model
+    return {
+      success: true,
+      variant: {
+        id: data.id,
+        productId: data.product_id,
+        sku: data.sku,
+        price: data.price,
+        compareAtPrice: data.compare_at_price || undefined,
+        inventory: {
+          quantity: data.inventory_quantity,
+          lowStockThreshold: data.low_stock_threshold,
+          status: data.inventory_status,
+          managed: data.inventory_managed,
+        },
+        attributes: data.attributes || {},
+        barcode: data.barcode || undefined,
+        images: data.images || [],
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      },
+    }
+  } catch (error) {
+    console.error("Failed to update product variant:", error)
+    return { success: false, error: "Failed to update product variant" }
+  }
+}
+
+// Delete a product variant
+export async function deleteProductVariant(variantId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = getSupabase()
+    const admin = await getCurrentAdmin()
+
+    // Get the variant before deletion to include in the log
+    const { data: variant, error: variantError } = await supabase
+      .from("product_variants")
+      .select("*, products!inner(id, name)")
+      .eq("id", variantId)
+      .single()
+
+    if (variantError) throw variantError
+
+    // Check if the variant is referenced in any orders
+    const { count, error: checkError } = await supabase
+      .from("order_items")
+      .select("*", { count: "exact", head: true })
+      .eq("variant_id", variantId)
+
+    if (checkError) {
+      console.error("Error checking order items:", checkError)
+    }
+
+    // If variant is used in orders, return an error
+    if (count && count > 0) {
+      return {
+        success: false,
+        error: "Cannot delete variant that has been ordered. Consider marking it as discontinued instead.",
+      }
+    }
+
+    // Log the variant deletion before actually deleting it
+    await supabase.from("inventory_logs").insert([
+      {
+        product_id: variant.product_id,
+        previous_quantity: variant.inventory_quantity,
+        new_quantity: 0,
+        reason: "variant_deleted",
+        user_id: admin?.id,
+        admin_name: admin?.username,
+        details: `Variant "${variant.sku}" deleted from product "${variant.products.name}"`,
+        timestamp: new Date().toISOString(),
+      },
+    ])
+
+    // Delete the variant
+    const { error } = await supabase.from("product_variants").delete().eq("id", variantId)
+
+    if (error) throw error
+
+    // Check if this was the last variant and update the product if needed
+    const { count: remainingVariants, error: countError } = await supabase
+      .from("product_variants")
+      .select("id", { count: "exact", head: true })
+      .eq("product_id", variant.product_id)
+
+    if (!countError && remainingVariants === 0) {
+      // This was the last variant, update the product
+      await supabase.from("products").update({ has_variants: false }).eq("id", variant.product_id)
+    }
+
+    // Revalidate paths and cache
+    revalidatePath("/admin/products")
+    revalidatePath(`/admin/products/${variant.product_id}`)
+    await revalidateProductCache()
+
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to delete product variant:", error)
+    return { success: false, error: "Failed to delete product variant" }
+  }
+}
+
+// Update the getProductById function to include variants
 export async function getProductById(id: string): Promise<Product | null> {
   try {
     const supabase = getSupabase()
@@ -69,6 +378,37 @@ export async function getProductById(id: string): Promise<Product | null> {
 
     if (!data) return null
 
+    // Get variants if the product has them
+    let variants: ProductVariant[] = []
+    if (data.has_variants) {
+      const { data: variantData, error: variantError } = await supabase
+        .from("product_variants")
+        .select("*")
+        .eq("product_id", id)
+        .order("created_at", { ascending: true })
+
+      if (!variantError && variantData) {
+        variants = variantData.map((variant) => ({
+          id: variant.id,
+          productId: variant.product_id,
+          sku: variant.sku,
+          price: variant.price,
+          compareAtPrice: variant.compare_at_price || undefined,
+          inventory: {
+            quantity: variant.inventory_quantity,
+            lowStockThreshold: variant.low_stock_threshold,
+            status: variant.inventory_status,
+            managed: variant.inventory_managed,
+          },
+          attributes: variant.attributes || {},
+          barcode: variant.barcode || undefined,
+          images: variant.images || [],
+          createdAt: variant.created_at,
+          updatedAt: variant.updated_at,
+        }))
+      }
+    }
+
     // Transform database model to our application model
     return {
       id: data.id,
@@ -78,6 +418,9 @@ export async function getProductById(id: string): Promise<Product | null> {
       compareAtPrice: data.compare_at_price || undefined,
       images: data.images,
       category: data.category || "",
+      subcategory: data.subcategory || undefined,
+      productType: data.product_type || undefined,
+      gender: data.gender || undefined,
       tags: data.tags,
       sku: data.sku,
       barcode: data.barcode || undefined,
@@ -88,6 +431,9 @@ export async function getProductById(id: string): Promise<Product | null> {
         managed: data.inventory_managed,
       },
       attributes: data.attributes || {},
+      hasVariants: data.has_variants || false,
+      variantAttributes: data.variant_attributes || [],
+      variants: variants.length > 0 ? variants : undefined,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     }
@@ -97,7 +443,7 @@ export async function getProductById(id: string): Promise<Product | null> {
   }
 }
 
-// Enhance the createProduct function to log product creation
+// Update the createProduct function to support variant attributes
 export async function createProduct(
   productData: Omit<Product, "id" | "createdAt" | "updatedAt">,
 ): Promise<{ success: boolean; product?: Product; error?: string }> {
@@ -115,6 +461,9 @@ export async function createProduct(
           compare_at_price: productData.compareAtPrice,
           images: productData.images,
           category: productData.category,
+          subcategory: productData.subcategory,
+          product_type: productData.productType,
+          gender: productData.gender,
           tags: productData.tags,
           sku: productData.sku,
           barcode: productData.barcode,
@@ -123,6 +472,8 @@ export async function createProduct(
           inventory_managed: productData.inventory.managed,
           inventory_status: productData.inventory.status,
           attributes: productData.attributes || {},
+          has_variants: productData.hasVariants || false,
+          variant_attributes: productData.variantAttributes || [],
         },
       ])
       .select("*")
@@ -146,7 +497,7 @@ export async function createProduct(
 
     // Revalidate paths and cache
     revalidatePath("/admin/products")
-    await revalidateProductCache() // Revalidate product cache
+    await revalidateProductCache()
 
     // Transform database model to our application model
     return {
@@ -159,6 +510,9 @@ export async function createProduct(
         compareAtPrice: data.compare_at_price || undefined,
         images: data.images,
         category: data.category || "",
+        subcategory: data.subcategory || undefined,
+        productType: productData.productType,
+        gender: productData.gender,
         tags: data.tags,
         sku: data.sku,
         barcode: data.barcode || undefined,
@@ -169,6 +523,8 @@ export async function createProduct(
           managed: data.inventory_managed,
         },
         attributes: data.attributes || {},
+        hasVariants: data.has_variants || false,
+        variantAttributes: data.variant_attributes || [],
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       },
@@ -179,7 +535,7 @@ export async function createProduct(
   }
 }
 
-// Enhance the updateProduct function to log product updates
+// Update the updateProduct function to support variant attributes
 export async function updateProduct(
   id: string,
   productData: Partial<Product>,
@@ -205,6 +561,9 @@ export async function updateProduct(
     if (productData.compareAtPrice !== undefined) updateData.compare_at_price = productData.compareAtPrice
     if (productData.images !== undefined) updateData.images = productData.images
     if (productData.category !== undefined) updateData.category = productData.category
+    if (productData.subcategory !== undefined) updateData.subcategory = productData.subcategory
+    if (productData.productType !== undefined) updateData.product_type = productData.productType
+    if (productData.gender !== undefined) updateData.gender = productData.gender
     if (productData.tags !== undefined) updateData.tags = productData.tags
     if (productData.sku !== undefined) updateData.sku = productData.sku
     if (productData.barcode !== undefined) updateData.barcode = productData.barcode
@@ -214,6 +573,8 @@ export async function updateProduct(
     if (productData.inventory?.managed !== undefined) updateData.inventory_managed = productData.inventory.managed
     if (productData.inventory?.status !== undefined) updateData.inventory_status = productData.inventory.status
     if (productData.attributes !== undefined) updateData.attributes = productData.attributes
+    if (productData.hasVariants !== undefined) updateData.has_variants = productData.hasVariants
+    if (productData.variantAttributes !== undefined) updateData.variant_attributes = productData.variantAttributes
 
     // Update the product
     const { data, error } = await supabase.from("products").update(updateData).eq("id", id).select("*").single()
@@ -249,10 +610,41 @@ export async function updateProduct(
       },
     ])
 
+    // Get variants if the product has them
+    let variants: ProductVariant[] = []
+    if (data.has_variants) {
+      const { data: variantData, error: variantError } = await supabase
+        .from("product_variants")
+        .select("*")
+        .eq("product_id", id)
+        .order("created_at", { ascending: true })
+
+      if (!variantError && variantData) {
+        variants = variantData.map((variant) => ({
+          id: variant.id,
+          productId: variant.product_id,
+          sku: variant.sku,
+          price: variant.price,
+          compareAtPrice: variant.compare_at_price || undefined,
+          inventory: {
+            quantity: variant.inventory_quantity,
+            lowStockThreshold: variant.low_stock_threshold,
+            status: variant.inventory_status,
+            managed: variant.inventory_managed,
+          },
+          attributes: variant.attributes || {},
+          barcode: variant.barcode || undefined,
+          images: variant.images || [],
+          createdAt: variant.created_at,
+          updatedAt: variant.updated_at,
+        }))
+      }
+    }
+
     // Revalidate paths and cache
     revalidatePath("/admin/products")
     revalidatePath(`/admin/products/${id}`)
-    await revalidateProductCache() // Revalidate product cache
+    await revalidateProductCache()
 
     // Transform database model to our application model
     return {
@@ -265,6 +657,9 @@ export async function updateProduct(
         compareAtPrice: data.compare_at_price || undefined,
         images: data.images,
         category: data.category || "",
+        subcategory: data.subcategory || undefined,
+        productType: data.product_type || undefined,
+        gender: data.gender || undefined,
         tags: data.tags,
         sku: data.sku,
         barcode: data.barcode || undefined,
@@ -275,6 +670,9 @@ export async function updateProduct(
           managed: data.inventory_managed,
         },
         attributes: data.attributes || {},
+        hasVariants: data.has_variants || false,
+        variantAttributes: data.variant_attributes || [],
+        variants: variants.length > 0 ? variants : undefined,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       },
