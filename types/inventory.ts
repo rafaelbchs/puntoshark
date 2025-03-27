@@ -38,11 +38,24 @@ export type ProductVariant = {
 export type InventoryUpdateLog = {
   id: string
   productId: string
+  productName?: string // Add product name for better readability in logs
   previousQuantity: number
   newQuantity: number
-  reason: "order" | "manual" | "return" | "adjustment"
+  reason: "order" | "manual" | "return" | "adjustment" | "product_created" | "product_updated" | "product_deleted"
   orderId?: string
   userId?: string
+  adminName?: string // Add admin name for tracking who made the change
+  details?: string // Additional details about the change
   timestamp: string
+}
+
+// Add a new type for log filtering
+export type LogFilter = {
+  productId?: string
+  reason?: string
+  adminId?: string
+  dateFrom?: string
+  dateTo?: string
+  searchTerm?: string
 }
 
