@@ -1,27 +1,42 @@
 import type React from "react"
-import { getPromoBannerSettings } from "@/app/actions/settings"
+import { getServiceSupabase } from "@/lib/supabase"
 import { Navbar } from "@/components/layout/navbar"
+
+// Disable all caching
+export const revalidate = 0
+export const dynamic = "force-dynamic"
+export const fetchCache = "force-no-store"
 
 export default async function MainLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Fetch promo banner settings
-  const promoBanner = await getPromoBannerSettings()
+  // Direct database query to get the banner data
+  const supabase = getServiceSupabase()
+  let banner = null
+
+  try {
+    console.log("Layout: Fetching banner data from settings table")
+    const { data, error } = await supabase.from("settings").select("value").eq("id", "promoBanner").single()
+
+    if (error) {
+      console.error("Layout: Error fetching banner:", error)
+    } else if (data && data.value) {
+      banner = data.value
+      console.log("Layout: Banner data fetched:", banner)
+    } else {
+      console.log("Layout: No banner data found or banner is disabled")
+    }
+  } catch (error) {
+    console.error("Layout: Exception fetching banner:", error)
+  }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Navbar banner={promoBanner} />
-      <main className="flex-1">{children}</main>
-      <footer className="border-t py-6 md:py-8">
-        <div className="container flex flex-col items-center justify-between gap-4 md:flex-row">
-          <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
-            © {new Date().getFullYear()} Your Store. All rights reserved.
-          </p>
-        </div>
-      </footer>
-    </div>
+    <>
+      <Navbar banner={banner} />
+      <main>{children}</main>
+    </>
   )
 }
 
