@@ -2,7 +2,6 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { ChevronRight } from "lucide-react"
-import { Navbar } from "@/components/layout/navbar"
 
 // This is a placeholder component for when you don't have products yet
 function EmptyState({ gender }: { gender: string }) {
@@ -93,7 +92,6 @@ export default function GenderPage({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
 
       <div className="pt-24 pb-6 bg-muted">
         <div className="container mx-auto px-4">
