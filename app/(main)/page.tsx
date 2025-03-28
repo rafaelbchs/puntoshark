@@ -1,14 +1,11 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Navbar } from "@/components/layout/navbar"
 import { ChevronRight } from "lucide-react"
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col">
-      <Navbar />
-
       {/* Hero Section */}
       <section className="relative h-screen w-full">
         <div className="absolute inset-0">
