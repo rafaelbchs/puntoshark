@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
-import { Navbar } from "@/components/layout/navbar"
 
 // This is a placeholder component for when you don't have products yet
 function EmptyState({ category, gender }: { category: string; gender: string }) {
@@ -66,8 +65,6 @@ export default function CategoryPage({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
-
       <div className="pt-24 pb-6 bg-muted">
         <div className="container mx-auto px-4">
           <div className="flex items-center text-sm">

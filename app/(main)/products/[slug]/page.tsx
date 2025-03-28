@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { Navbar } from "@/components/layout/navbar"
 
 export default function ProductPage({
   params,
@@ -24,7 +23,6 @@ export default function ProductPage({
   // If you have no products yet, show a not found page
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
 
       <div className="flex-1 pt-24">
         <div className="container mx-auto px-4 py-8">
