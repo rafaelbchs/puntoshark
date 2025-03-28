@@ -1,20 +1,29 @@
 "use client"
+import Link from "next/link"
+import type React from "react"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Megaphone, Mail } from "lucide-react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { Save, Store, Truck, Bell, Mail } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Save, Store, Truck, Bell } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { toast } from "@/hooks/use-toast"
-import { saveStoreSettings, saveShippingSettings, saveNotificationSettings, getSettings } from "@/app/actions/settings"
+import {
+  saveStoreSettings,
+  saveShippingSettings,
+  saveNotificationSettings,
+  getSettings,
+  savePromoBannerSettings,
+} from "@/app/actions/settings"
 import ProtectedAdminRoute from "@/components/protected-admin-route"
 
 // Form schemas
@@ -44,6 +53,17 @@ const notificationFormSchema = z.object({
   lowStockThreshold: z.number().min(1).default(5),
   adminEmail: z.string().email({ message: "Please enter a valid email address." }),
   emailTemplate: z.string().optional(),
+})
+
+// Add promo banner form schema
+const promoBannerFormSchema = z.object({
+  enabled: z.boolean().default(false),
+  text: z.string().min(1, { message: "Banner text is required" }),
+  bgColor: z.string().min(1, { message: "Background color is required" }),
+  textColor: z.string().min(1, { message: "Text color is required" }),
+  link: z.string().optional(),
+  startDate: z.date().nullable().optional(),
+  endDate: z.date().nullable().optional(),
 })
 
 // Default email template with alternative syntax that won't conflict with JSX
@@ -88,12 +108,10 @@ function convertFromHandlebars(template) {
     .replace(/\{\{total\}\}/g, "[total]")
 }
 
-export default function SettingsPage() {
-  const router = useRouter()
+export default function AdminSettingsClientPage() {
   const [activeTab, setActiveTab] = useState("store")
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Store form
   const storeForm = useForm<z.infer<typeof storeFormSchema>>({
     resolver: zodResolver(storeFormSchema),
     defaultValues: {
@@ -102,24 +120,22 @@ export default function SettingsPage() {
       storeEmail: "",
       storePhone: "",
       storeAddress: "",
-      storeCurrency: "USD",
-      storeTimeZone: "America/New_York",
+      storeCurrency: "",
+      storeTimeZone: "",
     },
   })
 
-  // Shipping form
   const shippingForm = useForm<z.infer<typeof shippingFormSchema>>({
     resolver: zodResolver(shippingFormSchema),
     defaultValues: {
       enableFreeShipping: false,
-      freeShippingThreshold: 100,
+      freeShippingThreshold: 0,
       enableFlatRate: true,
-      flatRateAmount: 10,
+      flatRateAmount: 0,
       enableLocalPickup: true,
     },
   })
 
-  // Notification form
   const notificationForm = useForm<z.infer<typeof notificationFormSchema>>({
     resolver: zodResolver(notificationFormSchema),
     defaultValues: {
@@ -133,40 +149,137 @@ export default function SettingsPage() {
     },
   })
 
-  // Load settings on page load
+  // Add promo banner form
+  const promoBannerForm = useForm<z.infer<typeof promoBannerFormSchema>>({
+    resolver: zodResolver(promoBannerFormSchema),
+    defaultValues: {
+      enabled: false,
+      text: "Free shipping on orders over $75",
+      bgColor: "#000000",
+      textColor: "#FFFFFF",
+      link: "",
+      startDate: null,
+      endDate: null,
+    },
+  })
+
+  async function onStoreSubmit(values: z.infer<typeof storeFormSchema>) {
+    setIsLoading(true)
+    try {
+      await saveStoreSettings(values)
+      toast({
+        title: "Success!",
+        description: "Store settings saved.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error!",
+        description: "Failed to save store settings.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function onShippingSubmit(values: z.infer<typeof shippingFormSchema>) {
+    setIsLoading(true)
+    try {
+      await saveShippingSettings(values)
+      toast({
+        title: "Success!",
+        description: "Shipping settings saved.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error!",
+        description: "Failed to save shipping settings.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function onNotificationSubmit(values: z.infer<typeof notificationFormSchema>) {
+    setIsLoading(true)
+    try {
+      // Convert to handlebars before saving
+      const handlebarsTemplate = convertToHandlebars(values.emailTemplate || DEFAULT_EMAIL_TEMPLATE)
+      await saveNotificationSettings({ ...values, emailTemplate: handlebarsTemplate })
+      toast({
+        title: "Success!",
+        description: "Notification settings saved.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error!",
+        description: "Failed to save notification settings.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Add promo banner submit handler
+  async function onPromoBannerSubmit(values: z.infer<typeof promoBannerFormSchema>) {
+    setIsLoading(true)
+    try {
+      await savePromoBannerSettings(values)
+      toast({
+        title: "Success!",
+        description: "Promo banner settings saved.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error!",
+        description: "Failed to save promo banner settings.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
-    const loadSettings = async () => {
+    async function loadSettings() {
+      setIsLoading(true)
       try {
-        setIsLoading(true)
         const settings = await getSettings()
 
-        // Update store form
-        if (settings.store) {
-          storeForm.reset(settings.store)
-        }
+        if (settings) {
+          // Convert email template from handlebars to custom syntax
+          const storeSettings = settings.storeSettings || {}
+          storeForm.reset(storeSettings)
 
-        // Update shipping form
-        if (settings.shipping) {
-          shippingForm.reset(settings.shipping)
-        }
+          const shippingSettings = settings.shippingSettings || {}
+          shippingForm.reset(shippingSettings)
 
-        // Update notification form
-        if (settings.notifications) {
-          // Convert handlebars syntax to our custom syntax for display
-          const convertedTemplate = settings.notifications.emailTemplate
-            ? convertFromHandlebars(settings.notifications.emailTemplate)
-            : DEFAULT_EMAIL_TEMPLATE
-
+          const notificationSettings = settings.notificationSettings || {}
           notificationForm.reset({
-            ...settings.notifications,
-            emailTemplate: convertedTemplate,
+            ...notificationSettings,
+            emailTemplate: convertFromHandlebars(notificationSettings.emailTemplate),
           })
+
+          // Load promo banner settings if they exist
+          if (settings.promoBanner) {
+            promoBannerForm.reset({
+              enabled: settings.promoBanner.enabled || false,
+              text: settings.promoBanner.text || "Free shipping on orders over $75",
+              bgColor: settings.promoBanner.bgColor || "#000000",
+              textColor: settings.promoBanner.textColor || "#FFFFFF",
+              link: settings.promoBanner.link || "",
+              startDate: settings.promoBanner.startDate ? new Date(settings.promoBanner.startDate) : null,
+              endDate: settings.promoBanner.endDate ? new Date(settings.promoBanner.endDate) : null,
+            })
+          }
         }
       } catch (error) {
         console.error("Failed to load settings:", error)
         toast({
-          title: "Error loading settings",
-          description: "Could not load your settings. Please try again.",
+          title: "Error!",
+          description: "Failed to load settings.",
           variant: "destructive",
         })
       } finally {
@@ -175,65 +288,7 @@ export default function SettingsPage() {
     }
 
     loadSettings()
-  }, [storeForm, shippingForm, notificationForm])
-
-  // Form submission handlers
-  const onStoreSubmit = async (data: z.infer<typeof storeFormSchema>) => {
-    try {
-      await saveStoreSettings(data)
-      toast({
-        title: "Store settings updated",
-        description: "Your store settings have been saved successfully.",
-      })
-    } catch (error) {
-      console.error("Failed to save store settings:", error)
-      toast({
-        title: "Error saving settings",
-        description: "Could not save your store settings. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const onShippingSubmit = async (data: z.infer<typeof shippingFormSchema>) => {
-    try {
-      await saveShippingSettings(data)
-      toast({
-        title: "Shipping settings updated",
-        description: "Your shipping settings have been saved successfully.",
-      })
-    } catch (error) {
-      console.error("Failed to save shipping settings:", error)
-      toast({
-        title: "Error saving settings",
-        description: "Could not save your shipping settings. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const onNotificationSubmit = async (data: z.infer<typeof notificationFormSchema>) => {
-    try {
-      // Convert our custom syntax back to handlebars before saving
-      const convertedData = {
-        ...data,
-        emailTemplate: convertToHandlebars(data.emailTemplate),
-      }
-
-      await saveNotificationSettings(convertedData)
-      toast({
-        title: "Notification settings updated",
-        description: "Your notification settings have been saved successfully.",
-      })
-    } catch (error) {
-      console.error("Failed to save notification settings:", error)
-      toast({
-        title: "Error saving settings",
-        description: "Could not save your notification settings. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
+  }, [])
 
   return (
     <ProtectedAdminRoute>
@@ -256,9 +311,13 @@ export default function SettingsPage() {
               <Bell className="h-4 w-4" />
               Notifications
             </TabsTrigger>
+            <TabsTrigger value="promo-banner" className="flex items-center gap-2">
+              <Megaphone className="h-4 w-4" />
+              Promo Banner
+            </TabsTrigger>
           </TabsList>
 
-          {/* Store Settings */}
+          {/* Store Settings Tab Content */}
           <TabsContent value="store">
             <Card>
               <CardHeader>
@@ -389,7 +448,7 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Shipping Settings */}
+          {/* Shipping Settings Tab Content */}
           <TabsContent value="shipping">
             <Card>
               <CardHeader>
@@ -520,7 +579,7 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Notification Settings */}
+          {/* Notification Settings Tab Content */}
           <TabsContent value="notifications">
             <Card>
               <CardHeader>
@@ -687,9 +746,223 @@ export default function SettingsPage() {
               </Form>
             </Card>
           </TabsContent>
+
+          {/* Promo Banner Settings Tab Content */}
+          <TabsContent value="promo-banner">
+            <Card>
+              <CardHeader>
+                <CardTitle>Promotional Banner</CardTitle>
+                <CardDescription>
+                  Configure the promotional banner that appears at the top of your store
+                </CardDescription>
+              </CardHeader>
+              <Form {...promoBannerForm}>
+                <form onSubmit={promoBannerForm.handleSubmit(onPromoBannerSubmit)}>
+                  <CardContent className="space-y-6">
+                    {isLoading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                      </div>
+                    ) : (
+                      <>
+                        <FormField
+                          control={promoBannerForm.control}
+                          name="enabled"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">Enable Promotional Banner</FormLabel>
+                                <FormDescription>Display a promotional banner at the top of your store</FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        {promoBannerForm.watch("enabled") && (
+                          <>
+                            <FormField
+                              control={promoBannerForm.control}
+                              name="text"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Banner Text</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} placeholder="Free shipping on orders over $75" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField
+                                control={promoBannerForm.control}
+                                name="bgColor"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Background Color</FormLabel>
+                                    <div className="flex items-center gap-2">
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <div
+                                        className="h-8 w-8 rounded border"
+                                        style={{ backgroundColor: field.value }}
+                                      />
+                                    </div>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={promoBannerForm.control}
+                                name="textColor"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Text Color</FormLabel>
+                                    <div className="flex items-center gap-2">
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <div
+                                        className="h-8 w-8 rounded border"
+                                        style={{ backgroundColor: field.value }}
+                                      />
+                                    </div>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+
+                            <FormField
+                              control={promoBannerForm.control}
+                              name="link"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Banner Link (Optional)</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} placeholder="/collections/sale" />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Add a link to direct customers when they click on the banner
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField
+                                control={promoBannerForm.control}
+                                name="startDate"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Start Date (Optional)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="datetime-local"
+                                        value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ""}
+                                        onChange={(e) => {
+                                          const date = e.target.value ? new Date(e.target.value) : null
+                                          field.onChange(date)
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>When the banner should start displaying</FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={promoBannerForm.control}
+                                name="endDate"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>End Date (Optional)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="datetime-local"
+                                        value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ""}
+                                        onChange={(e) => {
+                                          const date = e.target.value ? new Date(e.target.value) : null
+                                          field.onChange(date)
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>When the banner should stop displaying</FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+
+                            {/* Banner Preview */}
+                            <div className="space-y-2">
+                              <h3 className="text-sm font-medium">Banner Preview</h3>
+                              <div
+                                className="p-3 rounded flex items-center justify-center"
+                                style={{
+                                  backgroundColor: promoBannerForm.watch("bgColor"),
+                                  color: promoBannerForm.watch("textColor"),
+                                }}
+                              >
+                                {promoBannerForm.watch("text") || "Free shipping on orders over $75"}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                  <CardFooter>
+                    <Button type="submit" className="ml-auto" disabled={isLoading}>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Banner Settings
+                    </Button>
+                  </CardFooter>
+                </form>
+              </Form>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </ProtectedAdminRoute>
+  )
+}
+
+interface SettingCardProps {
+  title: string
+  description: string
+  icon: React.ReactNode
+  href: string
+}
+
+function SettingCard({ title, description, icon, href }: SettingCardProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center space-x-2">
+          <div className="p-2 bg-primary/10 rounded-full">{icon}</div>
+          <CardTitle>{title}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <CardDescription className="text-sm">{description}</CardDescription>
+      </CardContent>
+      <CardFooter>
+        <Link href={href} className="w-full">
+          <Button variant="outline" className="w-full">
+            Manage
+          </Button>
+        </Link>
+      </CardFooter>
+    </Card>
   )
 }
 
