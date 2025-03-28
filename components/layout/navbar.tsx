@@ -8,6 +8,8 @@ import { useCart } from "@/context/cart-context"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { CartDrawer } from "@/components/cart/cart-drawer"
 import { Logo } from "./logo"
+import { PromoBanner } from "./promo-banner"
+import type { PromoBanner as PromoBannerType } from "@/types/promo-banner"
 
 const navigationItems = [
   {
@@ -77,7 +79,11 @@ const navigationItems = [
   },
 ]
 
-export function Navbar() {
+interface NavbarProps {
+  banner: PromoBannerType | null
+}
+
+export function Navbar({ banner }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
@@ -116,9 +122,7 @@ export function Navbar() {
         }}
       >
         {/* Promo banner */}
-        <div className="bg-black text-white text-center py-2 text-sm font-medium">
-          GET TWO PAIRS OF ARRIVAL SHORTS FOR $40 🔥
-        </div>
+        <PromoBanner banner={banner} />
 
         <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
