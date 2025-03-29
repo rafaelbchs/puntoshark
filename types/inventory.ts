@@ -1,33 +1,7 @@
 export type ProductStatus = "in_stock" | "low_stock" | "out_of_stock" | "discontinued"
+export type ProductType = "tshirt" | "hoodie" | "sweatshirt" | "pants" | "shorts" | "hat" | "accessory" | "other"
+export type ProductGender = "men" | "women" | "unisex" | "kids"
 
-// Add these new types to your inventory.ts file
-
-export type ProductType = "clothing" | "accessories" | "footwear" | "home" | "other"
-
-export type ProductGender = "men" | "women" | "unisex" | "kids" | "baby" | null
-
-export interface ProductVariant {
-  id: string
-  productId: string
-  sku: string
-  price?: number // If null, use parent product price
-  compareAtPrice?: number
-  inventory: {
-    quantity: number
-    lowStockThreshold?: number
-    status: ProductStatus
-    managed: boolean
-  }
-  attributes: {
-    [key: string]: string // e.g., { "size": "L", "color": "Black" }
-  }
-  barcode?: string
-  images?: string[] // Optional variant-specific images
-  createdAt: string
-  updatedAt: string
-}
-
-// Update the Product interface to include new fields
 export interface Product {
   id: string
   name: string
@@ -36,11 +10,11 @@ export interface Product {
   compareAtPrice?: number
   images: string[]
   category: string
-  subcategory?: string // New field for more specific categorization
-  productType?: ProductType // New field for product type
-  gender?: ProductGender // New field for gender targeting
+  subcategory?: string
+  productType?: ProductType
+  gender?: ProductGender
   tags: string[]
-  sku: string // Base SKU for the product
+  sku: string
   barcode?: string
   inventory: {
     quantity: number
@@ -48,37 +22,58 @@ export interface Product {
     status: ProductStatus
     managed: boolean
   }
-  attributes: {
-    [key: string]: any // Product-level attributes
-  }
-  hasVariants: boolean // Whether this product has variants
-  variantAttributes?: string[] // List of attribute names used for variants (e.g., ["size", "color"])
-  variants?: ProductVariant[] // Optional array of variants
+  attributes: Record<string, any>
+  hasVariants?: boolean
+  variantAttributes?: string[]
+  variants?: ProductVariant[]
   createdAt: string
   updatedAt: string
 }
 
-export type InventoryUpdateLog = {
+export interface ProductVariant {
   id: string
   productId: string
-  productName?: string // Add product name for better readability in logs
+  sku: string
+  price: number
+  compareAtPrice?: number
+  inventory: {
+    quantity: number
+    lowStockThreshold: number
+    status: ProductStatus
+    managed: boolean
+  }
+  attributes: Record<string, any>
+  barcode?: string
+  images: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InventoryUpdateLog {
+  id: string
+  productId: string
+  productName?: string
   previousQuantity: number
   newQuantity: number
-  reason: "order" | "manual" | "return" | "adjustment" | "product_created" | "product_updated" | "product_deleted"
+  reason: string
   orderId?: string
   userId?: string
-  adminName?: string // Add admin name for tracking who made the change
-  details?: string // Additional details about the change
+  adminName?: string
+  details?: string
   timestamp: string
 }
 
-// Add a new type for log filtering
-export type LogFilter = {
+export interface LogFilter {
   productId?: string
   reason?: string
   adminId?: string
   dateFrom?: string
   dateTo?: string
   searchTerm?: string
+}
+
+export interface CategoryData {
+  name: string
+  subcategories: string[]
 }
 

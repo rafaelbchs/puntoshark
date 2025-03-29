@@ -1,3 +1,39 @@
+/**
+ * Utility functions for handling product images
+ */
+
+/**
+ * Gets a properly formatted URL for product card images
+ * Handles blob URLs, Supabase URLs, and fallbacks
+ */
+export function getProductCardImageUrl(url: string): string {
+  if (!url) return "/placeholder.svg?height=400&width=400"
+
+  // Skip blob URLs
+  if (url.startsWith("blob:")) {
+    return "/placeholder.svg?height=400&width=400"
+  }
+
+  // Return valid URLs
+  return url
+}
+
+/**
+ * Gets a properly formatted URL for product detail images
+ * Handles blob URLs, Supabase URLs, and fallbacks
+ */
+export function getProductDetailImageUrl(url: string): string {
+  if (!url) return "/placeholder.svg?height=800&width=800"
+
+  // Skip blob URLs
+  if (url.startsWith("blob:")) {
+    return "/placeholder.svg?height=800&width=800"
+  }
+
+  // Return valid URLs
+  return url
+}
+
 export function getOptimizedImageUrl(url: string, width?: number, height?: number): string {
   // If it's not a Supabase Storage URL, return the original URL
   if (!url || !url.includes("supabase")) {
@@ -33,25 +69,5 @@ export function getOptimizedImageUrl(url: string, width?: number, height?: numbe
  */
 export function getThumbnailUrl(url: string): string {
   return getOptimizedImageUrl(url, 200, 200)
-}
-
-/**
- * Generate a product card image URL
- *
- * @param url Original image URL
- * @returns Product card image URL
- */
-export function getProductCardImageUrl(url: string): string {
-  return getOptimizedImageUrl(url, 400, 400)
-}
-
-/**
- * Generate a product detail image URL
- *
- * @param url Original image URL
- * @returns Product detail image URL
- */
-export function getProductDetailImageUrl(url: string): string {
-  return getOptimizedImageUrl(url, 800, 800)
 }
 

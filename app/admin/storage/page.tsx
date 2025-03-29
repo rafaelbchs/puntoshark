@@ -174,8 +174,12 @@ export default function StorageManagementPage() {
         // Create file path
         const filePath = currentPath ? `${currentPath}/${file.name}` : file.name
 
-        // Upload file
-        const { error } = await supabase.storage.from(selectedBucket).upload(filePath, file)
+        // Upload file - use the correct method with proper content type
+        const { error } = await supabase.storage.from(selectedBucket).upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type, // Add content type to ensure proper file handling
+        })
 
         if (error) {
           throw error

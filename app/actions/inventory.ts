@@ -1,798 +1,322 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { randomUUID } from "crypto"
 import { getServiceSupabase } from "@/lib/supabase"
-import { revalidateProductCache } from "@/lib/products"
-import type { Product, ProductStatus, InventoryUpdateLog, ProductVariant } from "@/types/inventory"
-import type { Omit } from "@/types/utils"
-import type { Partial } from "@/types/utils"
+import type { Product, ProductVariant, InventoryUpdateLog, LogFilter } from "@/types/inventory"
 
-// Add these imports at the top if not already present
-import { getCurrentAdmin } from "@/lib/auth"
-
-// Get Supabase admin client
 const getSupabase = () => getServiceSupabase()
 
-// Get all products
-export async function getProducts(includeDiscontinued = true): Promise<Product[]> {
+// Improved SKU generation function to minimize duplicates
+async function generateUniqueSKU(name: string, category: string): Promise<string> {
+  const supabase = getSupabase()
+
+  // Get first 3 letters of category (uppercase)
+  const categoryPrefix = (category || "GEN").substring(0, 3).toUpperCase()
+
+  // Get first 3 letters of product name (uppercase)
+  const namePrefix = (name || "PRD").substring(0, 3).toUpperCase()
+
+  // Add timestamp component (last 4 digits of current timestamp)
+  const timestamp = Date.now().toString().slice(-4)
+
+  // Generate a random 4-digit number
+  const randomNum = Math.floor(1000 + Math.random() * 9000)
+
+  // Combine all parts to create a more unique SKU
+  const proposedSKU = `${categoryPrefix}-${namePrefix}-${timestamp}${randomNum}`
+
+  // Check if this SKU already exists
+  const { count } = await supabase.from("products").select("*", { count: "exact", head: true }).eq("sku", proposedSKU)
+
+  // If SKU exists, recursively try again with a new random number
+  if (count && count > 0) {
+    console.log(`SKU ${proposedSKU} already exists, generating a new one...`)
+    return generateUniqueSKU(name, category)
+  }
+
+  return proposedSKU
+}
+
+// Function to create a new product
+export async function createProduct(product: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<{
+  success: boolean
+  product?: Product
+  error?: string
+}> {
   try {
     const supabase = getSupabase()
-    let query = supabase.from("products").select("*").order("updated_at", { ascending: false })
 
-    // Filter out discontinued products if not explicitly included
-    if (!includeDiscontinued) {
-      query = query.neq("inventory_status", "discontinued")
-    }
+    // Generate a UUID for the product
+    const id = randomUUID()
 
-    const { data, error } = await query
+    // Filter out any blob URLs from images
+    const validImages = product.images?.filter((url) => !url.startsWith("blob:")) || []
 
-    if (error) throw error
+    // Generate a unique SKU if not provided
+    const sku = product.sku || (await generateUniqueSKU(product.name, product.category))
 
-    // Transform database model to our application model
-    return data.map((product) => ({
-      id: product.id,
+    // Set default gender to "unisex" if not provided
+    const gender = product.gender || "unisex"
+
+    // Prepare the data for insertion
+    const dbProduct = {
+      id,
       name: product.name,
-      description: product.description || "",
+      description: product.description,
       price: product.price,
-      compareAtPrice: product.compare_at_price || undefined,
-      images: product.images,
-      category: product.category || "",
-      tags: product.tags,
-      sku: product.sku,
-      barcode: product.barcode || undefined,
-      inventory: {
-        quantity: product.inventory_quantity,
-        lowStockThreshold: product.low_stock_threshold,
-        status: product.inventory_status,
-        managed: product.inventory_managed,
-      },
+      compare_at_price: product.compareAtPrice,
+      images: validImages,
+      category: product.category,
+      subcategory: product.subcategory,
+      product_type: product.productType,
+      gender: gender,
+      tags: product.tags || [],
+      sku,
+      barcode: product.barcode,
+      inventory_quantity: product.inventory_quantity || 0,
+      low_stock_threshold: product.low_stock_threshold || 5,
+      inventory_status: product.inventory_status || "in_stock",
+      inventory_managed: product.inventory_managed || true,
       attributes: product.attributes || {},
-      createdAt: product.created_at,
-      updatedAt: product.updated_at,
-    }))
-  } catch (error) {
-    console.error("Failed to get products:", error)
-    throw error
-  }
-}
-
-// Get product variants for a specific product
-export async function getProductVariants(productId: string): Promise<ProductVariant[]> {
-  try {
-    const supabase = getSupabase()
-    const { data, error } = await supabase
-      .from("product_variants")
-      .select("*")
-      .eq("product_id", productId)
-      .order("created_at", { ascending: true })
-
-    if (error) throw error
-
-    // Transform database model to our application model
-    return data.map((variant) => ({
-      id: variant.id,
-      productId: variant.product_id,
-      sku: variant.sku,
-      price: variant.price,
-      compareAtPrice: variant.compare_at_price || undefined,
-      inventory: {
-        quantity: variant.inventory_quantity,
-        lowStockThreshold: variant.low_stock_threshold,
-        status: variant.inventory_status,
-        managed: variant.inventory_managed,
-      },
-      attributes: variant.attributes || {},
-      barcode: variant.barcode || undefined,
-      images: variant.images || [],
-      createdAt: variant.created_at,
-      updatedAt: variant.updated_at,
-    }))
-  } catch (error) {
-    console.error("Failed to get product variants:", error)
-    throw error
-  }
-}
-
-// Create a product variant
-export async function createProductVariant(
-  productId: string,
-  variantData: Omit<ProductVariant, "id" | "productId" | "createdAt" | "updatedAt">,
-): Promise<{ success: boolean; variant?: ProductVariant; error?: string }> {
-  try {
-    const supabase = getSupabase()
-    const admin = await getCurrentAdmin()
-
-    // Check if product exists
-    const { data: product, error: productError } = await supabase
-      .from("products")
-      .select("id, name, has_variants")
-      .eq("id", productId)
-      .single()
-
-    if (productError) throw productError
-
-    // Update the product to indicate it has variants if not already set
-    if (!product.has_variants) {
-      await supabase.from("products").update({ has_variants: true }).eq("id", productId)
+      has_variants: product.has_variants || false,
+      variant_attributes: product.variant_attributes || [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
-    // Create the variant
-    const { data, error } = await supabase
-      .from("product_variants")
-      .insert([
-        {
-          product_id: productId,
-          sku: variantData.sku,
-          price: variantData.price,
-          compare_at_price: variantData.compareAtPrice,
-          inventory_quantity: variantData.inventory.quantity,
-          low_stock_threshold: variantData.inventory.lowStockThreshold,
-          inventory_status: variantData.inventory.status,
-          inventory_managed: variantData.inventory.managed,
-          attributes: variantData.attributes || {},
-          barcode: variantData.barcode,
-          images: variantData.images || [],
-        },
-      ])
-      .select("*")
-      .single()
-
-    if (error) throw error
-
-    // Log the variant creation
-    await supabase.from("inventory_logs").insert([
-      {
-        product_id: productId,
-        previous_quantity: 0,
-        new_quantity: data.inventory_quantity,
-        reason: "variant_created",
-        user_id: admin?.id,
-        admin_name: admin?.username,
-        details: `Variant "${data.sku}" created with initial inventory of ${data.inventory_quantity}`,
-        timestamp: new Date().toISOString(),
-      },
-    ])
-
-    // Revalidate paths and cache
-    revalidatePath("/admin/products")
-    revalidatePath(`/admin/products/${productId}`)
-    await revalidateProductCache()
-
-    // Transform database model to our application model
-    return {
-      success: true,
-      variant: {
-        id: data.id,
-        productId: data.product_id,
-        sku: data.sku,
-        price: data.price,
-        compareAtPrice: data.compare_at_price || undefined,
-        inventory: {
-          quantity: data.inventory_quantity,
-          lowStockThreshold: data.low_stock_threshold,
-          status: data.inventory_status,
-          managed: data.inventory_managed,
-        },
-        attributes: data.attributes || {},
-        barcode: data.barcode || undefined,
-        images: data.images || [],
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      },
-    }
-  } catch (error) {
-    console.error("Failed to create product variant:", error)
-    return { success: false, error: "Failed to create product variant" }
-  }
-}
-
-// Update a product variant
-export async function updateProductVariant(
-  variantId: string,
-  variantData: Partial<ProductVariant>,
-): Promise<{ success: boolean; variant?: ProductVariant; error?: string }> {
-  try {
-    const supabase = getSupabase()
-    const admin = await getCurrentAdmin()
-
-    // Get the current variant state to compare changes
-    const { data: currentVariant, error: fetchError } = await supabase
-      .from("product_variants")
-      .select("*, products!inner(name)")
-      .eq("id", variantId)
-      .single()
-
-    if (fetchError) throw fetchError
-
-    // Prepare update data
-    const updateData: any = {}
-    if (variantData.sku !== undefined) updateData.sku = variantData.sku
-    if (variantData.price !== undefined) updateData.price = variantData.price
-    if (variantData.compareAtPrice !== undefined) updateData.compare_at_price = variantData.compareAtPrice
-    if (variantData.inventory?.quantity !== undefined) updateData.inventory_quantity = variantData.inventory.quantity
-    if (variantData.inventory?.lowStockThreshold !== undefined)
-      updateData.low_stock_threshold = variantData.inventory.lowStockThreshold
-    if (variantData.inventory?.managed !== undefined) updateData.inventory_managed = variantData.inventory.managed
-    if (variantData.inventory?.status !== undefined) updateData.inventory_status = variantData.inventory.status
-    if (variantData.attributes !== undefined) updateData.attributes = variantData.attributes
-    if (variantData.barcode !== undefined) updateData.barcode = variantData.barcode
-    if (variantData.images !== undefined) updateData.images = variantData.images
-    updateData.updated_at = new Date().toISOString()
-
-    // Update the variant
-    const { data, error } = await supabase
-      .from("product_variants")
-      .update(updateData)
-      .eq("id", variantId)
-      .select("*")
-      .single()
-
-    if (error) throw error
-
-    // Generate details about what changed
-    const changes: string[] = []
-    if (currentVariant.sku !== data.sku) changes.push(`SKU changed from "${currentVariant.sku}" to "${data.sku}"`)
-    if (currentVariant.price !== data.price)
-      changes.push(`price changed from $${currentVariant.price} to $${data.price}`)
-    if (currentVariant.inventory_quantity !== data.inventory_quantity) {
-      changes.push(`inventory quantity changed from ${currentVariant.inventory_quantity} to ${data.inventory_quantity}`)
-    }
-
-    // Log the variant update if inventory changed
-    if (currentVariant.inventory_quantity !== data.inventory_quantity) {
-      await supabase.from("inventory_logs").insert([
-        {
-          product_id: currentVariant.product_id,
-          previous_quantity: currentVariant.inventory_quantity,
-          new_quantity: data.inventory_quantity,
-          reason: "variant_updated",
-          user_id: admin?.id,
-          admin_name: admin?.username,
-          details:
-            changes.length > 0
-              ? `Variant "${data.sku}" updated: ${changes.join(", ")}`
-              : `Variant "${data.sku}" updated with no significant changes`,
-          timestamp: new Date().toISOString(),
-        },
-      ])
-    }
-
-    // Revalidate paths and cache
-    revalidatePath("/admin/products")
-    revalidatePath(`/admin/products/${currentVariant.product_id}`)
-    await revalidateProductCache()
-
-    // Transform database model to our application model
-    return {
-      success: true,
-      variant: {
-        id: data.id,
-        productId: data.product_id,
-        sku: data.sku,
-        price: data.price,
-        compareAtPrice: data.compare_at_price || undefined,
-        inventory: {
-          quantity: data.inventory_quantity,
-          lowStockThreshold: data.low_stock_threshold,
-          status: data.inventory_status,
-          managed: data.inventory_managed,
-        },
-        attributes: data.attributes || {},
-        barcode: data.barcode || undefined,
-        images: data.images || [],
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      },
-    }
-  } catch (error) {
-    console.error("Failed to update product variant:", error)
-    return { success: false, error: "Failed to update product variant" }
-  }
-}
-
-// Delete a product variant
-export async function deleteProductVariant(variantId: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = getSupabase()
-    const admin = await getCurrentAdmin()
-
-    // Get the variant before deletion to include in the log
-    const { data: variant, error: variantError } = await supabase
-      .from("product_variants")
-      .select("*, products!inner(id, name)")
-      .eq("id", variantId)
-      .single()
-
-    if (variantError) throw variantError
-
-    // Check if the variant is referenced in any orders
-    const { count, error: checkError } = await supabase
-      .from("order_items")
-      .select("*", { count: "exact", head: true })
-      .eq("variant_id", variantId)
-
-    if (checkError) {
-      console.error("Error checking order items:", checkError)
-    }
-
-    // If variant is used in orders, return an error
-    if (count && count > 0) {
-      return {
-        success: false,
-        error: "Cannot delete variant that has been ordered. Consider marking it as discontinued instead.",
-      }
-    }
-
-    // Log the variant deletion before actually deleting it
-    await supabase.from("inventory_logs").insert([
-      {
-        product_id: variant.product_id,
-        previous_quantity: variant.inventory_quantity,
-        new_quantity: 0,
-        reason: "variant_deleted",
-        user_id: admin?.id,
-        admin_name: admin?.username,
-        details: `Variant "${variant.sku}" deleted from product "${variant.products.name}"`,
-        timestamp: new Date().toISOString(),
-      },
-    ])
-
-    // Delete the variant
-    const { error } = await supabase.from("product_variants").delete().eq("id", variantId)
-
-    if (error) throw error
-
-    // Check if this was the last variant and update the product if needed
-    const { count: remainingVariants, error: countError } = await supabase
-      .from("product_variants")
-      .select("id", { count: "exact", head: true })
-      .eq("product_id", variant.product_id)
-
-    if (!countError && remainingVariants === 0) {
-      // This was the last variant, update the product
-      await supabase.from("products").update({ has_variants: false }).eq("id", variant.product_id)
-    }
-
-    // Revalidate paths and cache
-    revalidatePath("/admin/products")
-    revalidatePath(`/admin/products/${variant.product_id}`)
-    await revalidateProductCache()
-
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to delete product variant:", error)
-    return { success: false, error: "Failed to delete product variant" }
-  }
-}
-
-// Update the getProductById function to include variants
-export async function getProductById(id: string): Promise<Product | null> {
-  try {
-    const supabase = getSupabase()
-    const { data, error } = await supabase.from("products").select("*").eq("id", id).single()
+    const { data, error } = await supabase.from("products").insert([dbProduct]).select("*").single()
 
     if (error) {
-      if (error.code === "PGRST116") return null // No rows returned
-      throw error
-    }
+      console.error("Error creating product:", error)
 
-    if (!data) return null
-
-    // Get variants if the product has them
-    let variants: ProductVariant[] = []
-    if (data.has_variants) {
-      const { data: variantData, error: variantError } = await supabase
-        .from("product_variants")
-        .select("*")
-        .eq("product_id", id)
-        .order("created_at", { ascending: true })
-
-      if (!variantError && variantData) {
-        variants = variantData.map((variant) => ({
-          id: variant.id,
-          productId: variant.product_id,
-          sku: variant.sku,
-          price: variant.price,
-          compareAtPrice: variant.compare_at_price || undefined,
-          inventory: {
-            quantity: variant.inventory_quantity,
-            lowStockThreshold: variant.low_stock_threshold,
-            status: variant.inventory_status,
-            managed: variant.inventory_managed,
-          },
-          attributes: variant.attributes || {},
-          barcode: variant.barcode || undefined,
-          images: variant.images || [],
-          createdAt: variant.created_at,
-          updatedAt: variant.updated_at,
-        }))
+      // Check if it's a duplicate SKU error
+      if (error.message.includes("duplicate key") && error.message.includes("sku")) {
+        // Try again with a forced new SKU
+        console.log("Duplicate SKU detected, retrying with a new SKU...")
+        const newSku = await generateUniqueSKU(product.name, product.category)
+        return createProduct({
+          ...product,
+          sku: newSku,
+        })
       }
+
+      return { success: false, error: error.message }
     }
 
-    // Transform database model to our application model
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description || "",
-      price: data.price,
-      compareAtPrice: data.compare_at_price || undefined,
-      images: data.images,
-      category: data.category || "",
-      subcategory: data.subcategory || undefined,
-      productType: data.product_type || undefined,
-      gender: data.gender || undefined,
-      tags: data.tags,
-      sku: data.sku,
-      barcode: data.barcode || undefined,
-      inventory: {
-        quantity: data.inventory_quantity,
-        lowStockThreshold: data.low_stock_threshold,
-        status: data.inventory_status,
-        managed: data.inventory_managed,
-      },
-      attributes: data.attributes || {},
-      hasVariants: data.has_variants || false,
-      variantAttributes: data.variant_attributes || [],
-      variants: variants.length > 0 ? variants : undefined,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    }
-  } catch (error) {
-    console.error("Failed to get product by ID:", error)
-    throw error
-  }
-}
+    // Create or update the category in the categories table
+    await createOrUpdateCategory(product.category, product.subcategory)
 
-// Update the createProduct function to support variant attributes
-export async function createProduct(
-  productData: Omit<Product, "id" | "createdAt" | "updatedAt">,
-): Promise<{ success: boolean; product?: Product; error?: string }> {
-  try {
-    const supabase = getSupabase()
-    const admin = await getCurrentAdmin()
-
-    const { data, error } = await supabase
-      .from("products")
-      .insert([
-        {
-          name: productData.name,
-          description: productData.description,
-          price: productData.price,
-          compare_at_price: productData.compareAtPrice,
-          images: productData.images,
-          category: productData.category,
-          subcategory: productData.subcategory,
-          product_type: productData.productType,
-          gender: productData.gender,
-          tags: productData.tags,
-          sku: productData.sku,
-          barcode: productData.barcode,
-          inventory_quantity: productData.inventory.quantity,
-          low_stock_threshold: productData.inventory.lowStockThreshold,
-          inventory_managed: productData.inventory.managed,
-          inventory_status: productData.inventory.status,
-          attributes: productData.attributes || {},
-          has_variants: productData.hasVariants || false,
-          variant_attributes: productData.variantAttributes || [],
-        },
-      ])
-      .select("*")
-      .single()
-
-    if (error) throw error
-
-    // Log the product creation
-    await supabase.from("inventory_logs").insert([
-      {
-        product_id: data.id,
-        previous_quantity: 0,
-        new_quantity: data.inventory_quantity,
-        reason: "product_created",
-        user_id: admin?.id,
-        admin_name: admin?.username,
-        details: `Product "${data.name}" created with initial inventory of ${data.inventory_quantity}`,
-        timestamp: new Date().toISOString(),
-      },
-    ])
-
-    // Revalidate paths and cache
     revalidatePath("/admin/products")
-    await revalidateProductCache()
+    revalidatePath("/admin/inventory")
+    revalidatePath("/")
+    revalidatePath(`/collections/${gender}/${product.category}`)
 
-    // Transform database model to our application model
-    return {
-      success: true,
-      product: {
-        id: data.id,
-        name: data.name,
-        description: data.description || "",
-        price: data.price,
-        compareAtPrice: data.compare_at_price || undefined,
-        images: data.images,
-        category: data.category || "",
-        subcategory: data.subcategory || undefined,
-        productType: productData.productType,
-        gender: productData.gender,
-        tags: data.tags,
-        sku: data.sku,
-        barcode: data.barcode || undefined,
-        inventory: {
-          quantity: data.inventory_quantity,
-          lowStockThreshold: data.low_stock_threshold,
-          status: data.inventory_status,
-          managed: data.inventory_managed,
-        },
-        attributes: data.attributes || {},
-        hasVariants: data.has_variants || false,
-        variantAttributes: data.variant_attributes || [],
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      },
-    }
-  } catch (error) {
-    console.error("Failed to create product:", error)
-    return { success: false, error: "Failed to create product" }
+    return { success: true, product: transformDbProductToProduct(data) }
+  } catch (error: any) {
+    console.error("Unexpected error creating product:", error)
+    return { success: false, error: error.message || "Unexpected error creating product" }
   }
 }
 
-// Update the updateProduct function to support variant attributes
+// Function to update an existing product
 export async function updateProduct(
   id: string,
-  productData: Partial<Product>,
+  updates: Partial<Product>,
 ): Promise<{ success: boolean; product?: Product; error?: string }> {
   try {
     const supabase = getSupabase()
-    const admin = await getCurrentAdmin()
 
-    // Get the current product state to compare changes
-    const { data: currentProduct, error: fetchError } = await supabase
-      .from("products")
-      .select("*")
-      .eq("id", id)
-      .single()
+    // Prepare the data for update
+    const updateData: any = {
+      ...updates,
+      updated_at: new Date().toISOString(),
+    }
 
-    if (fetchError) throw fetchError
+    // Map frontend field names to database field names
+    if (updates.compareAtPrice !== undefined) {
+      updateData.compare_at_price = updates.compareAtPrice
+      delete updateData.compareAtPrice
+    }
 
-    // Prepare update data
-    const updateData: any = {}
-    if (productData.name !== undefined) updateData.name = productData.name
-    if (productData.description !== undefined) updateData.description = productData.description
-    if (productData.price !== undefined) updateData.price = productData.price
-    if (productData.compareAtPrice !== undefined) updateData.compare_at_price = productData.compareAtPrice
-    if (productData.images !== undefined) updateData.images = productData.images
-    if (productData.category !== undefined) updateData.category = productData.category
-    if (productData.subcategory !== undefined) updateData.subcategory = productData.subcategory
-    if (productData.productType !== undefined) updateData.product_type = productData.productType
-    if (productData.gender !== undefined) updateData.gender = productData.gender
-    if (productData.tags !== undefined) updateData.tags = productData.tags
-    if (productData.sku !== undefined) updateData.sku = productData.sku
-    if (productData.barcode !== undefined) updateData.barcode = productData.barcode
-    if (productData.inventory?.quantity !== undefined) updateData.inventory_quantity = productData.inventory.quantity
-    if (productData.inventory?.lowStockThreshold !== undefined)
-      updateData.low_stock_threshold = productData.inventory.lowStockThreshold
-    if (productData.inventory?.managed !== undefined) updateData.inventory_managed = productData.inventory.managed
-    if (productData.inventory?.status !== undefined) updateData.inventory_status = productData.inventory.status
-    if (productData.attributes !== undefined) updateData.attributes = productData.attributes
-    if (productData.hasVariants !== undefined) updateData.has_variants = productData.hasVariants
-    if (productData.variantAttributes !== undefined) updateData.variant_attributes = productData.variantAttributes
+    if (updates.productType !== undefined) {
+      updateData.product_type = updates.productType
+      delete updateData.productType
+    }
 
-    // Update the product
+    if (updates.variantAttributes !== undefined) {
+      updateData.variant_attributes = updates.variantAttributes
+      delete updateData.variantAttributes
+    }
+
+    if (updates.hasVariants !== undefined) {
+      updateData.has_variants = updates.hasVariants
+      delete updateData.hasVariants
+    }
+
+    // If inventory fields are provided in the nested inventory object, flatten them
+    if (updates.inventory) {
+      if (updates.inventory.quantity !== undefined) {
+        updateData.inventory_quantity = updates.inventory.quantity
+      }
+      if (updates.inventory.lowStockThreshold !== undefined) {
+        updateData.low_stock_threshold = updates.inventory.lowStockThreshold
+      }
+      if (updates.inventory.status !== undefined) {
+        updateData.inventory_status = updates.inventory.status
+      }
+      if (updates.inventory.managed !== undefined) {
+        updateData.inventory_managed = updates.inventory.managed
+      }
+      delete updateData.inventory
+    }
+
+    // If SKU is being updated, check if it's unique
+    if (updates.sku) {
+      const { count } = await supabase
+        .from("products")
+        .select("*", { count: "exact", head: true })
+        .eq("sku", updates.sku)
+        .neq("id", id) // Exclude the current product
+
+      if (count && count > 0) {
+        return {
+          success: false,
+          error: "SKU already exists. Please use a different SKU.",
+        }
+      }
+    }
+
     const { data, error } = await supabase.from("products").update(updateData).eq("id", id).select("*").single()
 
-    if (error) throw error
-
-    // Generate details about what changed
-    const changes: string[] = []
-    if (currentProduct.name !== data.name) changes.push(`name changed from "${currentProduct.name}" to "${data.name}"`)
-    if (currentProduct.price !== data.price)
-      changes.push(`price changed from $${currentProduct.price} to $${data.price}`)
-    if (currentProduct.inventory_quantity !== data.inventory_quantity) {
-      changes.push(`inventory quantity changed from ${currentProduct.inventory_quantity} to ${data.inventory_quantity}`)
-    }
-    if (currentProduct.inventory_status !== data.inventory_status) {
-      changes.push(`status changed from ${currentProduct.inventory_status} to ${data.inventory_status}`)
+    if (error) {
+      console.error("Error updating product:", error)
+      return { success: false, error: error.message }
     }
 
-    // Log the product update regardless of what changed
-    await supabase.from("inventory_logs").insert([
+    // Create or update the category in the categories table if category is updated
+    if (updates.category) {
+      await createOrUpdateCategory(updates.category, updates.subcategory)
+    }
+
+    revalidatePath("/admin/products")
+    revalidatePath("/admin/inventory")
+    revalidatePath("/")
+    revalidatePath(`/collections/${data.gender}/${data.category}`)
+
+    return { success: true, product: transformDbProductToProduct(data) }
+  } catch (error: any) {
+    console.error("Unexpected error updating product:", error)
+    return { success: false, error: error.message || "Unexpected error updating product" }
+  }
+}
+
+// Create or update a category in the categories table
+async function createOrUpdateCategory(category: string, subcategory = "") {
+  const supabase = getSupabase()
+
+  // Check if the category already exists
+  const { data: existingCategory, error: categoryError } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("name", category)
+    .single()
+
+  if (categoryError && categoryError.code !== "PGRST116") {
+    console.error("Error checking existing category:", categoryError)
+    return // Stop if there's an error other than 'not found'
+  }
+
+  if (!existingCategory) {
+    // Category doesn't exist, so create it
+    const { error: insertError } = await supabase.from("categories").insert([
       {
-        product_id: data.id,
-        previous_quantity: currentProduct.inventory_quantity,
-        new_quantity: data.inventory_quantity,
-        reason: "product_updated",
-        user_id: admin?.id,
-        admin_name: admin?.username,
-        details:
-          changes.length > 0
-            ? `Product "${data.name}" updated: ${changes.join(", ")}`
-            : `Product "${data.name}" updated with no significant changes`,
-        timestamp: new Date().toISOString(),
+        name: category,
+        subcategories: subcategory ? [subcategory] : [],
       },
     ])
 
-    // Get variants if the product has them
-    let variants: ProductVariant[] = []
-    if (data.has_variants) {
-      const { data: variantData, error: variantError } = await supabase
-        .from("product_variants")
-        .select("*")
-        .eq("product_id", id)
-        .order("created_at", { ascending: true })
+    if (insertError) {
+      console.error("Error creating category:", insertError)
+    } else {
+      revalidatePath("/categories")
+    }
+  } else {
+    // Category exists, check if subcategory needs to be added to the array
+    if (subcategory) {
+      const currentSubcategories = existingCategory.subcategories || []
 
-      if (!variantError && variantData) {
-        variants = variantData.map((variant) => ({
-          id: variant.id,
-          productId: variant.product_id,
-          sku: variant.sku,
-          price: variant.price,
-          compareAtPrice: variant.compare_at_price || undefined,
-          inventory: {
-            quantity: variant.inventory_quantity,
-            lowStockThreshold: variant.low_stock_threshold,
-            status: variant.inventory_status,
-            managed: variant.inventory_managed,
-          },
-          attributes: variant.attributes || {},
-          barcode: variant.barcode || undefined,
-          images: variant.images || [],
-          createdAt: variant.created_at,
-          updatedAt: variant.updated_at,
-        }))
+      // Only add if it doesn't already exist in the array
+      if (!currentSubcategories.includes(subcategory)) {
+        const updatedSubcategories = [...currentSubcategories, subcategory]
+
+        const { error: updateError } = await supabase
+          .from("categories")
+          .update({ subcategories: updatedSubcategories })
+          .eq("name", category)
+
+        if (updateError) {
+          console.error("Error updating subcategories:", updateError)
+        } else {
+          revalidatePath("/categories")
+        }
       }
     }
-
-    // Revalidate paths and cache
-    revalidatePath("/admin/products")
-    revalidatePath(`/admin/products/${id}`)
-    await revalidateProductCache()
-
-    // Transform database model to our application model
-    return {
-      success: true,
-      product: {
-        id: data.id,
-        name: data.name,
-        description: data.description || "",
-        price: data.price,
-        compareAtPrice: data.compare_at_price || undefined,
-        images: data.images,
-        category: data.category || "",
-        subcategory: data.subcategory || undefined,
-        productType: data.product_type || undefined,
-        gender: data.gender || undefined,
-        tags: data.tags,
-        sku: data.sku,
-        barcode: data.barcode || undefined,
-        inventory: {
-          quantity: data.inventory_quantity,
-          lowStockThreshold: data.low_stock_threshold,
-          status: data.inventory_status,
-          managed: data.inventory_managed,
-        },
-        attributes: data.attributes || {},
-        hasVariants: data.has_variants || false,
-        variantAttributes: data.variant_attributes || [],
-        variants: variants.length > 0 ? variants : undefined,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      },
-    }
-  } catch (error) {
-    console.error("Failed to update product:", error)
-    return { success: false, error: "Failed to update product" }
   }
 }
 
-// Enhance the deleteProduct function to log product deletion
-export async function deleteProduct(id: string): Promise<{ success: boolean; error?: string }> {
+// Function to get all categories
+export async function getCategories(): Promise<{ name: string; subcategories: string[] }[]> {
   try {
     const supabase = getSupabase()
-    const admin = await getCurrentAdmin()
 
-    // Get the product before deletion to include in the log
-    const { data: product, error: productError } = await supabase.from("products").select("*").eq("id", id).single()
-
-    if (productError) {
-      console.error("Error fetching product for deletion log:", productError)
-      // Continue with deletion even if we can't get the product details
-    }
-
-    // Check if the product is referenced in any orders
-    const { count, error: checkError } = await supabase
-      .from("order_items")
-      .select("*", { count: "exact", head: true })
-      .eq("product_id", id)
-
-    if (checkError) {
-      console.error("Error checking order items:", checkError)
-    }
-
-    // If product is used in orders, return an error
-    if (count && count > 0) {
-      return {
-        success: false,
-        error: "Cannot delete product that has been ordered. Consider marking it as discontinued instead.",
-      }
-    }
-
-    // Log the product deletion before actually deleting it
-    if (product) {
-      await supabase.from("inventory_logs").insert([
-        {
-          product_id: id,
-          previous_quantity: product.inventory_quantity,
-          new_quantity: 0,
-          reason: "product_deleted",
-          user_id: admin?.id,
-          admin_name: admin?.username,
-          details: `Product "${product.name}" (SKU: ${product.sku}) deleted`,
-          timestamp: new Date().toISOString(),
-        },
-      ])
-    }
-
-    // Then delete related inventory logs
-    await supabase.from("inventory_logs").delete().eq("product_id", id)
-
-    // Then delete the product
-    const { error } = await supabase.from("products").delete().eq("id", id)
+    const { data, error } = await supabase.from("categories").select("*").order("name", { ascending: true })
 
     if (error) {
-      console.error("Delete product error:", error)
-      return { success: false, error: error.message || "Failed to delete product" }
+      console.error("Error fetching categories:", error)
+      return []
     }
 
-    // Revalidate paths and cache
-    revalidatePath("/admin/products")
-    await revalidateProductCache() // Revalidate product cache
-
-    return { success: true }
+    return data.map((category) => ({
+      name: category.name,
+      subcategories: category.subcategories || [],
+    }))
   } catch (error) {
-    console.error("Failed to delete product:", error)
-    return { success: false, error: "Failed to delete product" }
+    console.error("Failed to get categories:", error)
+    return []
   }
 }
 
-// Enhance the updateInventory function to include admin information
+// Function to update inventory
 export async function updateInventory(
   productId: string,
   newQuantity: number,
   reason: string,
   orderId?: string,
   userId?: string,
-  notes?: string, // Add notes parameter
-): Promise<{ success: boolean; product?: Product; log?: InventoryUpdateLog; error?: string }> {
+  details?: string,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = getSupabase()
-    const admin = await getCurrentAdmin()
 
-    // Get current product
+    // Get the product
     const { data: product, error: productError } = await supabase
       .from("products")
       .select("*")
       .eq("id", productId)
       .single()
 
-    if (productError || !product) {
-      console.error("Product fetch error:", productError)
+    if (productError) {
+      console.error("Error fetching product:", productError)
       return { success: false, error: "Product not found" }
     }
 
-    const previousQuantity = product.inventory_quantity
-
-    // If quantity hasn't changed, return early with success
-    if (previousQuantity === newQuantity) {
-      return {
-        success: true,
-        product: transformProductData(product),
-      }
-    }
-
     // Determine new status
-    const newStatus = determineProductStatus(newQuantity, product.low_stock_threshold)
+    const newStatus =
+      newQuantity <= 0 ? "out_of_stock" : newQuantity <= product.low_stock_threshold ? "low_stock" : "in_stock"
 
-    // Update product
-    const { data: updatedProduct, error: updateError } = await supabase
+    // Update product inventory
+    const { error: updateError } = await supabase
       .from("products")
       .update({
         inventory_quantity: newQuantity,
@@ -800,94 +324,97 @@ export async function updateInventory(
         updated_at: new Date().toISOString(),
       })
       .eq("id", productId)
-      .select("*")
-      .single()
 
     if (updateError) {
-      console.error("Product update error:", updateError)
-      return { success: false, error: "Failed to update product" }
+      console.error("Error updating inventory:", updateError)
+      return { success: false, error: "Failed to update inventory" }
     }
 
-    // Create details message
-    const detailsMessage = notes
-      ? `Inventory adjusted from ${previousQuantity} to ${newQuantity} (${reason}). Notes: ${notes}`
-      : `Inventory adjusted from ${previousQuantity} to ${newQuantity} (${reason})`
-
-    // Create inventory log with admin information
-    const { data: log, error: logError } = await supabase
-      .from("inventory_logs")
-      .insert([
-        {
-          product_id: productId,
-          previous_quantity: previousQuantity,
-          new_quantity: newQuantity,
-          reason,
-          order_id: orderId,
-          user_id: userId || admin?.id,
-          admin_name: admin?.username,
-          details: detailsMessage,
-          timestamp: new Date().toISOString(),
-        },
-      ])
-      .select("*")
+    // Create inventory log
+    const { data: admin, error: adminError } = await supabase
+      .from("admins")
+      .select("username")
+      .eq("id", userId)
       .single()
 
+    const { error: logError } = await supabase.from("inventory_logs").insert([
+      {
+        product_id: productId,
+        product_name: product.name,
+        previous_quantity: product.inventory_quantity,
+        new_quantity: newQuantity,
+        reason,
+        order_id: orderId,
+        user_id: userId,
+        admin_name: admin?.username,
+        details,
+      },
+    ])
+
     if (logError) {
-      console.error("Log creation error:", logError)
-      // Continue even if log creation fails, but return the error
-      return {
-        success: true,
-        product: transformProductData(updatedProduct),
-        error: "Product updated but failed to create log entry",
-      }
+      console.error("Error creating inventory log:", logError)
     }
 
-    // Revalidate paths and cache
-    revalidatePath("/admin/products")
-    revalidatePath(`/admin/products/${productId}`)
     revalidatePath("/admin/inventory")
-    revalidatePath("/admin/inventory/logs")
-    await revalidateProductCache() // Revalidate product cache
+    revalidatePath(`/admin/inventory/adjust/${productId}`)
+    revalidatePath(`/admin/inventory/logs`)
+    revalidatePath(`/admin/products/${productId}`)
 
-    // Transform database models to our application models
-    return {
-      success: true,
-      product: transformProductData(updatedProduct),
-      log: log
-        ? {
-            id: log.id,
-            productId: log.product_id,
-            productName: updatedProduct.name,
-            previousQuantity: log.previous_quantity,
-            newQuantity: log.new_quantity,
-            reason: log.reason,
-            orderId: log.order_id || undefined,
-            userId: log.user_id || undefined,
-            adminName: log.admin_name || undefined,
-            details: log.details || undefined,
-            timestamp: log.timestamp,
-          }
-        : undefined,
-    }
+    return { success: true }
   } catch (error) {
-    console.error("Failed to update inventory:", error)
-    return { success: false, error: "Failed to update inventory" }
+    console.error("Unexpected error updating inventory:", error)
+    return { success: false, error: "Unexpected error updating inventory" }
   }
 }
 
-// Helper function to transform product data
-function transformProductData(data: any): Product {
+// Function to "delete" a product (soft delete by marking as discontinued)
+export async function deleteProduct(productId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = getSupabase()
+
+    // Instead of deleting, update the product to mark it as discontinued
+    const { error } = await supabase
+      .from("products")
+      .update({
+        inventory_status: "discontinued",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId)
+
+    if (error) {
+      console.error("Error deleting product:", error)
+      return { success: false, error: error.message }
+    }
+
+    // Revalidate all relevant paths
+    revalidatePath("/admin/products")
+    revalidatePath("/admin/inventory")
+    revalidatePath("/")
+    revalidatePath("/collections")
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Unexpected error deleting product:", error)
+    return { success: false, error: error.message || "Unexpected error deleting product" }
+  }
+}
+
+// Helper function to transform database product to frontend product
+function transformDbProductToProduct(data: any): Product {
   return {
     id: data.id,
     name: data.name,
     description: data.description || "",
     price: data.price,
-    compareAtPrice: data.compare_at_price || undefined,
-    images: data.images,
+    compareAtPrice: data.compare_at_price,
+    images: data.images || [],
     category: data.category || "",
-    tags: data.tags,
+    subcategory: data.subcategory,
+    productType: data.product_type,
+    gender: data.gender,
+    tags: data.tags || [],
     sku: data.sku,
-    barcode: data.barcode || undefined,
+    barcode: data.barcode,
     inventory: {
       quantity: data.inventory_quantity,
       lowStockThreshold: data.low_stock_threshold,
@@ -895,104 +422,248 @@ function transformProductData(data: any): Product {
       managed: data.inventory_managed,
     },
     attributes: data.attributes || {},
+    hasVariants: data.has_variants || false,
+    variantAttributes: data.variant_attributes || [],
     createdAt: data.created_at,
     updatedAt: data.updated_at,
+    // Keep the original fields too for compatibility
+    inventory_quantity: data.inventory_quantity,
+    inventory_status: data.inventory_status,
+    inventory_managed: data.inventory_managed,
+    low_stock_threshold: data.low_stock_threshold,
   }
 }
 
-// Helper function to determine product status based on quantity
-function determineProductStatus(quantity: number, lowStockThreshold: number): ProductStatus {
-  if (quantity <= 0) {
-    return "out_of_stock"
-  } else if (quantity <= lowStockThreshold) {
-    return "low_stock"
-  } else {
-    return "in_stock"
-  }
-}
-
-// Modify the getInventoryLogs function to support pagination and filtering
-export async function getInventoryLogs(
-  options: {
-    productId?: string
-    reason?: string
-    adminId?: string
-    dateFrom?: string
-    dateTo?: string
-    searchTerm?: string
-    page?: number
-    pageSize?: number
-  } = {},
-): Promise<{ logs: InventoryUpdateLog[]; total: number }> {
+// Function to get a product by ID
+export async function getProductById(id: string): Promise<Product | null> {
   try {
     const supabase = getSupabase()
-    const { productId, reason, adminId, dateFrom, dateTo, searchTerm, page = 1, pageSize = 10 } = options
 
-    // Calculate pagination
-    const from = (page - 1) * pageSize
-    const to = from + pageSize - 1
+    const { data, error } = await supabase.from("products").select("*").eq("id", id).single()
 
-    // Start building the query
-    let query = supabase.from("inventory_logs").select("*, products!inner(name)", { count: "exact" })
-
-    // Apply filters
-    if (productId) {
-      query = query.eq("product_id", productId)
+    if (error) {
+      console.error("Error fetching product:", error)
+      return null
     }
 
-    if (reason) {
-      query = query.eq("reason", reason)
+    return transformDbProductToProduct(data)
+  } catch (error) {
+    console.error("Unexpected error fetching product:", error)
+    return null
+  }
+}
+
+// Function to get all products
+export async function getProducts(includeDiscontinued = false): Promise<Product[]> {
+  try {
+    const supabase = getSupabase()
+    let query = supabase.from("products").select("*").order("created_at", { ascending: false })
+
+    if (!includeDiscontinued) {
+      query = query.neq("inventory_status", "discontinued")
     }
 
-    if (adminId) {
-      query = query.eq("user_id", adminId)
+    const { data, error } = await query
+
+    if (error) {
+      console.error("Error fetching products:", error)
+      return []
     }
 
-    if (dateFrom) {
-      query = query.gte("timestamp", dateFrom)
+    // Transform the database models to match the frontend model
+    return data.map(transformDbProductToProduct)
+  } catch (error) {
+    console.error("Unexpected error fetching products:", error)
+    return []
+  }
+}
+
+// Function to get inventory logs
+export async function getInventoryLogs(filter: LogFilter): Promise<{ logs: InventoryUpdateLog[]; total: number }> {
+  try {
+    const supabase = getSupabase()
+
+    let query = supabase
+      .from("inventory_logs")
+      .select("*, products(name)", { count: "exact" })
+      .order("timestamp", { ascending: false })
+
+    if (filter.productId) {
+      query = query.eq("product_id", filter.productId)
     }
 
-    if (dateTo) {
-      // Add one day to include the end date fully
-      const nextDay = new Date(dateTo)
-      nextDay.setDate(nextDay.getDate() + 1)
-      query = query.lt("timestamp", nextDay.toISOString())
+    if (filter.reason) {
+      query = query.eq("reason", filter.reason)
     }
 
-    if (searchTerm) {
-      // Search in product name or admin name or order ID
-      query = query.or(
-        `products.name.ilike.%${searchTerm}%,admin_name.ilike.%${searchTerm}%,order_id.ilike.%${searchTerm}%`,
-      )
+    if (filter.adminId) {
+      query = query.eq("user_id", filter.adminId)
     }
 
-    // Apply pagination and ordering
-    query = query.order("timestamp", { ascending: false }).range(from, to)
+    if (filter.dateFrom) {
+      query = query.gte("timestamp", filter.dateFrom)
+    }
 
-    // Execute the query
+    if (filter.dateTo) {
+      query = query.lte("timestamp", filter.dateTo)
+    }
+
+    if (filter.searchTerm) {
+      query = query.ilike("products.name", `%${filter.searchTerm}%`)
+    }
+
     const { data, error, count } = await query
 
-    if (error) throw error
+    if (error) {
+      console.error("Error fetching inventory logs:", error)
+      return { logs: [], total: 0 }
+    }
 
-    // Transform database models to our application models
-    const logs = data.map((log) => ({
+    const logs: InventoryUpdateLog[] = data.map((log: any) => ({
       id: log.id,
       productId: log.product_id,
-      productName: log.products?.name,
+      productName: log.products?.name || "Unknown",
       previousQuantity: log.previous_quantity,
       newQuantity: log.new_quantity,
       reason: log.reason,
-      orderId: log.order_id || undefined,
-      userId: log.user_id || undefined,
-      adminName: log.admin_name || undefined,
-      details: log.details || undefined,
+      orderId: log.order_id,
+      userId: log.user_id,
+      adminName: log.admin_name,
+      details: log.details,
       timestamp: log.timestamp,
     }))
 
     return { logs, total: count || 0 }
   } catch (error) {
     console.error("Failed to get inventory logs:", error)
-    throw error
+    return { logs: [], total: 0 }
+  }
+}
+
+// Function to create a new product variant
+export async function createProductVariant(
+  productId: string,
+  variant: Omit<ProductVariant, "id" | "createdAt" | "updatedAt" | "productId">,
+): Promise<{ success: boolean; variant?: ProductVariant; error?: string }> {
+  try {
+    const supabase = getSupabase()
+
+    // Get the parent product to use for SKU generation if needed
+    const { data: parentProduct } = await supabase
+      .from("products")
+      .select("name, category, sku")
+      .eq("id", productId)
+      .single()
+
+    // Generate a unique SKU for the variant if not provided
+    let variantSku = variant.sku
+    if (!variantSku && parentProduct) {
+      // Use parent SKU as base and add variant suffix
+      const baseSku = parentProduct.sku || (await generateUniqueSKU(parentProduct.name, parentProduct.category))
+      const variantSuffix = Date.now().toString().slice(-3) + Math.floor(100 + Math.random() * 900)
+      variantSku = `${baseSku}-V${variantSuffix}`
+
+      // Check if this variant SKU already exists
+      const { count } = await supabase
+        .from("product_variants")
+        .select("*", { count: "exact", head: true })
+        .eq("sku", variantSku)
+
+      // If SKU exists, generate a completely new one
+      if (count && count > 0) {
+        variantSku = await generateUniqueSKU(parentProduct.name + " Variant", parentProduct.category)
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("product_variants")
+      .insert([
+        {
+          product_id: productId,
+          sku: variantSku,
+          price: variant.price,
+          compare_at_price: variant.compareAtPrice,
+          inventory_quantity: variant.inventory.quantity,
+          low_stock_threshold: variant.inventory.lowStockThreshold,
+          inventory_status: variant.inventory.status,
+          inventory_managed: variant.inventory.managed,
+          attributes: variant.attributes,
+        },
+      ])
+      .select("*")
+      .single()
+
+    if (error) {
+      console.error("Error creating product variant:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath(`/admin/products/${productId}`)
+
+    return { success: true, variant: data as ProductVariant }
+  } catch (error) {
+    console.error("Unexpected error creating product variant:", error)
+    return { success: false, error: "Unexpected error creating product variant" }
+  }
+}
+
+// Function to update an existing product variant
+export async function updateProductVariant(
+  variantId: string,
+  updates: Partial<ProductVariant>,
+): Promise<{ success: boolean; variant?: ProductVariant; error?: string }> {
+  try {
+    const supabase = getSupabase()
+
+    const { data, error } = await supabase
+      .from("product_variants")
+      .update({
+        sku: updates.sku,
+        price: updates.price,
+        compare_at_price: updates.compareAtPrice,
+        inventory_quantity: updates.inventory?.quantity,
+        low_stock_threshold: updates.inventory?.lowStockThreshold,
+        inventory_status: updates.inventory?.status,
+        inventory_managed: updates.inventory?.managed,
+        attributes: updates.attributes,
+      })
+      .eq("id", variantId)
+      .select("*")
+      .single()
+
+    if (error) {
+      console.error("Error updating product variant:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath(`/admin/products/${data.product_id}`)
+
+    return { success: true, variant: data as ProductVariant }
+  } catch (error) {
+    console.error("Unexpected error updating product variant:", error)
+    return { success: false, error: "Unexpected error updating product variant" }
+  }
+}
+
+// Function to delete a product variant
+export async function deleteProductVariant(variantId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = getSupabase()
+
+    const { error } = await supabase.from("product_variants").delete().eq("id", variantId)
+
+    if (error) {
+      console.error("Error deleting product variant:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/admin/products")
+    revalidatePath("/admin/inventory")
+
+    return { success: true }
+  } catch (error) {
+    console.error("Unexpected error deleting product variant:", error)
+    return { success: false, error: "Unexpected error deleting product variant" }
   }
 }
 

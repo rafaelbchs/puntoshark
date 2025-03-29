@@ -38,6 +38,12 @@ export default function AdminProductsPage() {
   const fetchProducts = async () => {
     try {
       const productsData = await getProducts()
+
+      // Log the first product to see its structure
+      if (productsData && productsData.length > 0) {
+        console.log("First product data:", productsData[0])
+      }
+
       setProducts(productsData || [])
       setLoading(false)
     } catch (error) {
@@ -62,20 +68,26 @@ export default function AdminProductsPage() {
       const product = products.find((p) => p.id === productId)
       if (!product) return
 
-      const result = await updateProduct(productId, {
-        inventory: {
-          ...product.inventory,
-          status: "discontinued",
-          managed: false,
-        },
-      })
+      // Check if product has inventory property or direct inventory_quantity
+      const inventoryUpdate = product.inventory
+        ? { inventory: { ...product.inventory, status: "discontinued", managed: false } }
+        : { inventory_status: "discontinued", inventory_managed: false }
+
+      const result = await updateProduct(productId, inventoryUpdate)
 
       if (result.success) {
         // Update the product in the local state
         setProducts(
-          products.map((p) =>
-            p.id === productId ? { ...p, inventory: { ...p.inventory, status: "discontinued", managed: false } } : p,
-          ),
+          products.map((p) => {
+            if (p.id === productId) {
+              if (p.inventory) {
+                return { ...p, inventory: { ...p.inventory, status: "discontinued", managed: false } }
+              } else {
+                return { ...p, inventory_status: "discontinued", inventory_managed: false }
+              }
+            }
+            return p
+          }),
         )
 
         toast({
@@ -107,43 +119,33 @@ export default function AdminProductsPage() {
       const result = await deleteProduct(productToDelete)
 
       if (result.success) {
-        setProducts(products.filter((product) => product.id !== productToDelete))
+        // Instead of removing from the array, update the product status in the UI
+        setProducts(
+          products.map((product) => {
+            if (product.id === productToDelete) {
+              if (product.inventory) {
+                return { ...product, inventory: { ...product.inventory, status: "discontinued" } }
+              } else {
+                return { ...product, inventory_status: "discontinued" }
+              }
+            }
+            return product
+          }),
+        )
+
         toast({
           title: "Success",
-          description: "Product deleted successfully",
+          description: "Product has been discontinued",
         })
       } else {
-        // If the product can't be deleted because it's in orders, offer to mark it as discontinued
-        if (result.error?.includes("Cannot delete product that has been ordered")) {
-          toast({
-            title: "Cannot Delete Product",
-            description:
-              "This product has been ordered by customers. Would you like to mark it as discontinued instead?",
-            variant: "destructive",
-            action: (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  markAsDiscontinued(productToDelete)
-                  setDeleteDialogOpen(false)
-                  setProductToDelete(null)
-                }}
-                className="mt-2"
-              >
-                Mark as Discontinued
-              </Button>
-            ),
-          })
-        } else {
-          toast({
-            title: "Error",
-            description: result.error || "Failed to delete product",
-            variant: "destructive",
-          })
-        }
+        toast({
+          title: "Error",
+          description: result.error || "Failed to discontinue product",
+          variant: "destructive",
+        })
       }
     } catch (error) {
-      console.error("Failed to delete product:", error)
+      console.error("Failed to discontinue product:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -155,7 +157,29 @@ export default function AdminProductsPage() {
     }
   }
 
-  const getStatusBadge = (status: Product["inventory"]["status"]) => {
+  // Helper function to get inventory quantity regardless of data structure
+  const getInventoryQuantity = (product: any): number => {
+    if (product.inventory && typeof product.inventory.quantity === "number") {
+      return product.inventory.quantity
+    }
+    if (typeof product.inventory_quantity === "number") {
+      return product.inventory_quantity
+    }
+    return 0
+  }
+
+  // Helper function to get inventory status regardless of data structure
+  const getInventoryStatus = (product: any): string => {
+    if (product.inventory && product.inventory.status) {
+      return product.inventory.status
+    }
+    if (product.inventory_status) {
+      return product.inventory_status
+    }
+    return "out_of_stock"
+  }
+
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "in_stock":
         return <Badge className="bg-green-100 text-green-800">In Stock</Badge>
@@ -238,9 +262,9 @@ export default function AdminProductsPage() {
                           <TableCell className="font-medium">{product.name}</TableCell>
                           <TableCell className="hidden sm:table-cell">{product.sku}</TableCell>
                           <TableCell>${product.price.toFixed(2)}</TableCell>
-                          <TableCell className="hidden md:table-cell">{product.inventory.quantity}</TableCell>
+                          <TableCell className="hidden md:table-cell">{getInventoryQuantity(product)}</TableCell>
                           <TableCell className="hidden sm:table-cell">
-                            {getStatusBadge(product.inventory.status)}
+                            {getStatusBadge(getInventoryStatus(product))}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
@@ -276,14 +300,14 @@ export default function AdminProductsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the product and remove it from your
-                inventory.
+                This will mark the product as discontinued and remove it from your store. You can still view it in the
+                admin panel.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
-                Delete
+                Discontinue
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/hooks/use-toast"
 import { createProductVariant, updateProductVariant } from "@/app/actions/inventory"
 import type { Product, ProductVariant } from "@/types/inventory"
@@ -35,13 +36,13 @@ export default function ProductVariantForm({
 }: ProductVariantFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    sku: variant?.sku || `${product.sku}-${Date.now().toString().slice(-4)}`,
-    price: variant?.price || product.price,
+    sku: variant?.sku || `${product?.sku}-${Date.now().toString().slice(-4)}`,
+    price: variant?.price || product?.price,
     compareAtPrice: variant?.compareAtPrice || 0,
-    inventoryQuantity: variant?.inventory.quantity || 0,
+    inventoryQuantity: variant?.inventory?.quantity || 0,
     attributes:
       variant?.attributes ||
-      product.variantAttributes?.reduce(
+      product?.variantAttributes?.reduce(
         (acc, attr) => {
           acc[attr] = ""
           return acc
@@ -50,6 +51,14 @@ export default function ProductVariantForm({
       ) ||
       {},
   })
+
+  // Define common attribute options for dropdown selects
+  const attributeOptions: Record<string, string[]> = {
+    size: ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "One Size"],
+    color: ["Red", "Blue", "Green", "Black", "White", "Yellow", "Purple", "Orange", "Pink", "Gray"],
+    material: ["Cotton", "Polyester", "Wool", "Silk", "Leather", "Denim", "Linen", "Nylon"],
+    style: ["Casual", "Formal", "Sport", "Vintage", "Modern", "Classic"],
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -62,13 +71,18 @@ export default function ProductVariantForm({
   }
 
   const handleAttributeChange = (attribute: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      attributes: {
+    console.log(`Changing attribute ${attribute} to ${value}`)
+    setFormData((prev) => {
+      const updatedAttributes = {
         ...prev.attributes,
         [attribute]: value,
-      },
-    }))
+      }
+      console.log("Updated attributes:", updatedAttributes)
+      return {
+        ...prev,
+        attributes: updatedAttributes,
+      }
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,9 +96,9 @@ export default function ProductVariantForm({
         compareAtPrice: formData.compareAtPrice || undefined,
         inventory: {
           quantity: formData.inventoryQuantity,
-          lowStockThreshold: product.inventory.lowStockThreshold,
-          status: determineStatus(formData.inventoryQuantity, product.inventory.lowStockThreshold),
-          managed: product.inventory.managed,
+          lowStockThreshold: product.inventory?.lowStockThreshold || 5,
+          status: determineStatus(formData.inventoryQuantity, product.inventory?.lowStockThreshold || 5),
+          managed: product.inventory?.managed || true,
         },
         attributes: formData.attributes,
       }
@@ -130,6 +144,11 @@ export default function ProductVariantForm({
     return "in_stock"
   }
 
+  // Helper to determine if we should show a dropdown for this attribute
+  const hasPresetOptions = (attr: string) => {
+    return Object.keys(attributeOptions).includes(attr.toLowerCase())
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -149,15 +168,33 @@ export default function ProductVariantForm({
               <Input id="sku" name="sku" value={formData.sku} onChange={handleChange} required />
             </div>
 
-            {product.variantAttributes?.map((attr) => (
+            {product?.variantAttributes?.map((attr) => (
               <div key={attr} className="space-y-2">
-                <Label htmlFor={`attr-${attr}`}>{attr}</Label>
-                <Input
-                  id={`attr-${attr}`}
-                  value={formData.attributes[attr] || ""}
-                  onChange={(e) => handleAttributeChange(attr, e.target.value)}
-                  placeholder={`Enter ${attr.toLowerCase()}`}
-                />
+                <Label htmlFor={`attr-${attr}`}>{attr.charAt(0).toUpperCase() + attr.slice(1)}</Label>
+                {hasPresetOptions(attr) ? (
+                  <Select
+                    value={formData.attributes[attr] || ""}
+                    onValueChange={(value) => handleAttributeChange(attr, value)}
+                  >
+                    <SelectTrigger id={`attr-${attr}`} className="w-full">
+                      <SelectValue placeholder={`Select ${attr}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {attributeOptions[attr.toLowerCase()]?.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    id={`attr-${attr}`}
+                    value={formData.attributes[attr] || ""}
+                    onChange={(e) => handleAttributeChange(attr, e.target.value)}
+                    placeholder={`Enter ${attr.toLowerCase()}`}
+                  />
+                )}
               </div>
             ))}
 
