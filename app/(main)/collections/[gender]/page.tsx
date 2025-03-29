@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
 import { ChevronRight } from "lucide-react"
+import { getProducts, getCategories } from "@/app/actions/inventory"
+import ProductGrid from "@/components/product-grid"
 
 // This is a placeholder component for when you don't have products yet
 function EmptyState({ gender }: { gender: string }) {
@@ -43,7 +44,7 @@ function EmptyState({ gender }: { gender: string }) {
   )
 }
 
-export default function GenderPage({
+export default async function GenderPage({
   params,
 }: {
   params: { gender: string }
@@ -51,7 +52,7 @@ export default function GenderPage({
   const { gender } = params
 
   // Validate the gender
-  const validGenders = ["men", "women", "accessories"]
+  const validGenders = ["men", "women", "accessories", "unisex", "kids"]
   if (!validGenders.includes(gender)) {
     return notFound()
   }
@@ -59,40 +60,32 @@ export default function GenderPage({
   // Format the gender for display
   const formattedGender = gender.charAt(0).toUpperCase() + gender.slice(1)
 
-  // Get the appropriate categories based on gender
-  const categories =
-    gender === "accessories"
-      ? [
-          { name: "Bags", href: `/collections/${gender}/bags`, image: "/placeholder.svg?height=400&width=300" },
-          {
-            name: "Hats & Caps",
-            href: `/collections/${gender}/hats-caps`,
-            image: "/placeholder.svg?height=400&width=300",
-          },
-          {
-            name: "Water Bottles",
-            href: `/collections/${gender}/water-bottles`,
-            image: "/placeholder.svg?height=400&width=300",
-          },
-        ]
-      : [
-          { name: "T-Shirts", href: `/collections/${gender}/t-shirts`, image: "/placeholder.svg?height=400&width=300" },
-          {
-            name: gender === "men" ? "Shorts" : "Leggings",
-            href: `/collections/${gender}/${gender === "men" ? "shorts" : "leggings"}`,
-            image: "/placeholder.svg?height=400&width=300",
-          },
-          { name: "Hoodies", href: `/collections/${gender}/hoodies`, image: "/placeholder.svg?height=400&width=300" },
-          {
-            name: gender === "men" ? "Joggers" : "Sports Bras",
-            href: `/collections/${gender}/${gender === "men" ? "joggers" : "sports-bras"}`,
-            image: "/placeholder.svg?height=400&width=300",
-          },
-        ]
+  // Fetch products for this gender
+  const products = await getProducts()
+
+  // Fetch categories to display subcategory links
+  const categories = await getCategories()
+
+  // Filter products by gender
+  const filteredProducts = products.filter((product) => {
+    // For gender matching:
+    // 1. If product.gender is null, show in all genders except accessories
+    // 2. If gender is "accessories", match products with null gender or "accessories" gender
+    // 3. Otherwise, match the gender exactly (case insensitive)
+    if (gender === "accessories") {
+      return !product.gender || product.gender.toLowerCase() === "accessories"
+    } else if (!product.gender) {
+      return true
+    } else {
+      return product.gender.toLowerCase() === gender.toLowerCase()
+    }
+  })
+
+  // Get unique categories from the filtered products
+  const uniqueCategories = [...new Set(filteredProducts.map((product) => product.category))].filter(Boolean)
 
   return (
     <div className="min-h-screen flex flex-col">
-
       <div className="pt-24 pb-6 bg-muted">
         <div className="container mx-auto px-4">
           <div className="flex items-center text-sm">
@@ -104,37 +97,30 @@ export default function GenderPage({
           </div>
 
           <h1 className="text-3xl font-bold mt-4">{formattedGender}'s Collection</h1>
+
+          {/* Category links */}
+          {uniqueCategories.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {uniqueCategories.map((category) => {
+                // Convert category to kebab-case for URL
+                const categorySlug = category?.toLowerCase().replace(/\s+/g, "-")
+                return (
+                  <Link
+                    key={category}
+                    href={`/collections/${gender}/${categorySlug}`}
+                    className="px-3 py-1 bg-background rounded-full text-sm hover:bg-primary hover:text-primary-foreground transition-colors"
+                  >
+                    {category}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-12">
-        <h2 className="text-2xl font-semibold mb-8">Categories</h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {categories.map((category) => (
-            <Link key={category.name} href={category.href} className="group">
-              <div className="aspect-h-4 aspect-w-3 overflow-hidden rounded-lg bg-gray-100">
-                <Image
-                  src={category.image || "/placeholder.svg"}
-                  alt={category.name}
-                  width={300}
-                  height={400}
-                  className="h-full w-full object-cover object-center group-hover:opacity-75 transition-opacity"
-                />
-              </div>
-              <div className="mt-4">
-                <h3 className="text-base font-medium text-foreground">{category.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground group-hover:text-primary transition-colors">
-                  Shop Now
-                </p>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        <div className="mt-16">
-          <EmptyState gender={gender} />
-        </div>
+      <div className="flex-1 container mx-auto px-4 py-8">
+        {filteredProducts.length > 0 ? <ProductGrid products={filteredProducts} /> : <EmptyState gender={gender} />}
       </div>
     </div>
   )

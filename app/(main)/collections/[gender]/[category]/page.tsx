@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
+import { getProducts } from "@/app/actions/inventory"
+import ProductGrid from "@/components/product-grid"
 
 // This is a placeholder component for when you don't have products yet
 function EmptyState({ category, gender }: { category: string; gender: string }) {
@@ -42,7 +44,7 @@ function EmptyState({ category, gender }: { category: string; gender: string }) 
   )
 }
 
-export default function CategoryPage({
+export default async function CategoryPage({
   params,
 }: {
   params: { gender: string; category: string }
@@ -50,7 +52,7 @@ export default function CategoryPage({
   const { gender, category } = params
 
   // Validate the gender and category
-  const validGenders = ["men", "women", "accessories"]
+  const validGenders = ["men", "women", "accessories", "unisex", "kids"]
   if (!validGenders.includes(gender)) {
     return notFound()
   }
@@ -62,6 +64,62 @@ export default function CategoryPage({
     .join(" ")
 
   const formattedGender = gender.charAt(0).toUpperCase() + gender.slice(1)
+
+  // Fetch products for this category and gender
+  const products = await getProducts(false) // false means don't include discontinued products
+
+  // Format the category for comparison (convert from kebab-case to normal case)
+  const formattedSearchCategory = category.replace(/-/g, " ").toLowerCase()
+
+  // Debug logging
+  console.log(`Looking for products with gender: ${gender}, category: ${formattedSearchCategory}`)
+  console.log(`Total products before filtering: ${products.length}`)
+
+  // Filter products by gender and category - with more flexible matching
+  const filteredProducts = products.filter((product) => {
+    // For gender matching:
+    // 1. If product.gender is null, show in all genders except accessories
+    // 2. If gender is "accessories", match products with null gender or "accessories" gender
+    // 3. Otherwise, match the gender exactly (case insensitive)
+    let genderMatch = false
+
+    if (gender === "accessories") {
+      // For accessories, include products with null gender or "accessories" gender
+      genderMatch = !product.gender || product.gender.toLowerCase() === "accessories"
+    } else if (!product.gender) {
+      // For null gender products, include in all gender categories
+      genderMatch = true
+    } else {
+      // Normal gender matching (case insensitive)
+      genderMatch = product.gender.toLowerCase() === gender.toLowerCase()
+    }
+
+    // For category matching:
+    // 1. Convert both to lowercase for case-insensitive comparison
+    // 2. Check both category and subcategory
+    // 3. Handle special cases like "t-shirts" vs "tshirts" vs "t shirts"
+    const productCategory = (product.category || "").toLowerCase()
+    const productSubcategory = (product.subcategory || "").toLowerCase()
+
+    // Normalize categories by removing spaces and hyphens for comparison
+    const normalizedProductCategory = productCategory.replace(/[\s-]/g, "")
+    const normalizedProductSubcategory = productSubcategory.replace(/[\s-]/g, "")
+    const normalizedSearchCategory = formattedSearchCategory.replace(/[\s-]/g, "")
+
+    const categoryMatch =
+      productCategory === formattedSearchCategory ||
+      productSubcategory === formattedSearchCategory ||
+      normalizedProductCategory === normalizedSearchCategory ||
+      normalizedProductSubcategory === normalizedSearchCategory
+
+    // Debug logging for each product
+    console.log(`Product: ${product.name}, Gender: ${product.gender}, Category: ${product.category}`)
+    console.log(`Gender match: ${genderMatch}, Category match: ${categoryMatch}`)
+
+    return genderMatch && categoryMatch
+  })
+
+  console.log(`Found ${filteredProducts.length} products for ${gender}/${formattedSearchCategory}`)
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -86,8 +144,11 @@ export default function CategoryPage({
       </div>
 
       <div className="flex-1 container mx-auto px-4 py-8">
-        {/* This is where you'll map through your actual products once you have them */}
-        <EmptyState category={formattedCategory.toLowerCase()} gender={gender} />
+        {filteredProducts.length > 0 ? (
+          <ProductGrid products={filteredProducts} />
+        ) : (
+          <EmptyState category={formattedCategory.toLowerCase()} gender={gender} />
+        )}
       </div>
     </div>
   )
