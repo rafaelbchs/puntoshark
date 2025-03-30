@@ -92,7 +92,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                             >
                               <Minus className="h-3 w-3" />
                             </button>
-                            <span className="px-2 text-sm">{item.quantity}</span>
+                            <span className="px-2 text-sm font-medium text-gray-900">{item.quantity}</span>
                             <button
                               onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
                               className="px-2 py-1 text-gray-500 hover:text-black"
@@ -136,7 +136,11 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
               </div>
 
               <div className="mt-6">
-                <Button className="w-full bg-black hover:bg-gray-900 text-white py-3 rounded-none">Checkout</Button>
+                <Link href="/checkout" passHref>
+                  <Button onClick={onClose} className="w-full bg-black hover:bg-gray-900 text-white py-3 rounded-none">
+                    Checkout
+                  </Button>
+                </Link>
                 <button onClick={onClose} className="mt-4 text-sm text-center w-full text-gray-500 hover:text-black">
                   Continue Shopping
                 </button>

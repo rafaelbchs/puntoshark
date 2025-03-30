@@ -3,7 +3,7 @@ import Image from "next/image"
 import { ChevronRight } from "lucide-react"
 import { getProductById } from "@/app/actions/inventory"
 import { getProductDetailImageUrl } from "@/lib/image-utils"
-import { Button } from "@/components/ui/button"
+import { AddToCartButton } from "@/components/add-to-cart-button"
 
 export default async function ProductPage({
   params,
@@ -147,23 +147,23 @@ export default async function ProductPage({
 
             {/* Inventory Status */}
             <div>
-              <p className="text-sm">
-                Status: <span className="font-medium capitalize">{product.inventory.status.replace(/_/g, " ")}</span>
-              </p>
               {product.inventory.status === "in_stock" && (
-                <p className="text-sm text-green-600">In Stock: {product.inventory.quantity} available</p>
+                <p className="text-sm text-green-600 font-medium">In Stock</p>
               )}
               {product.inventory.status === "low_stock" && (
-                <p className="text-sm text-amber-600">Low Stock: Only {product.inventory.quantity} left</p>
+                <p className="text-sm text-amber-600 font-medium">Low Stock</p>
               )}
-              {product.inventory.status === "out_of_stock" && <p className="text-sm text-red-600">Out of Stock</p>}
+              {product.inventory.status === "out_of_stock" && (
+                <p className="text-sm text-red-600 font-medium">Out of Stock</p>
+              )}
+              {product.inventory.status === "discontinued" && (
+                <p className="text-sm text-gray-600 font-medium">Discontinued</p>
+              )}
             </div>
 
             {/* Add to Cart Button */}
             <div className="pt-4">
-              <Button size="lg" className="w-full" disabled={product.inventory.status === "out_of_stock"}>
-                {product.inventory.status === "out_of_stock" ? "Out of Stock" : "Add to Cart"}
-              </Button>
+              <AddToCartButton product={product} />
             </div>
 
             {/* Product Metadata */}
