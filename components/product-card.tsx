@@ -25,8 +25,6 @@ export function ProductCard({ product }: ProductCardProps) {
   // Get optimized image URL
   const optimizedImageUrl = getProductCardImageUrl(imageUrl)
 
-  console.log("Product card image:", imageUrl) // Add this log to debug
-
   const { addItem } = useCart()
 
   const handleAddToCart = () => {

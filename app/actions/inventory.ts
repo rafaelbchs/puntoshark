@@ -667,3 +667,30 @@ export async function deleteProductVariant(variantId: string): Promise<{ success
   }
 }
 
+export async function getProductsByCategory(category: string, gender?: string): Promise<Product[]> {
+  const supabase = getSupabase()
+  let query = supabase.from("products").select("*").order("created_at", { ascending: false })
+
+  // For accessories, we need to handle them differently
+  if (category.toLowerCase() === "accessories" || gender === "accessories") {
+    // Use product_type for accessories instead of category
+    query = query.eq("product_type", "accessories")
+  } else {
+    // For other categories, filter by category and gender if provided
+    query = query.ilike("category", `%${category}%`)
+
+    // If gender is provided, filter by gender
+    if (gender && gender !== "accessories") {
+      query = query.eq("gender", gender)
+    }
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error("Error fetching products by category:", error)
+    throw new Error("Failed to fetch products by category")
+  }
+
+  return data.map(transformDbProductToProduct)
+}

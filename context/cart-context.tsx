@@ -46,7 +46,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       // Save to cookies for server actions
       document.cookie = `cart=${encodeURIComponent(JSON.stringify(items))}; path=/; max-age=604800; SameSite=Lax`
 
-      console.log("Cart saved:", items)
+      // Silent save
     } catch (error) {
       console.error("Failed to save cart", error)
     }

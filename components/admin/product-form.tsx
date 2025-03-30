@@ -93,6 +93,10 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
   const [isDeleting, setIsDeleting] = useState(false)
   const [isLoadingVariants, setIsLoadingVariants] = useState(false)
 
+  // New state for custom variant attributes
+  const [newCustomAttribute, setNewCustomAttribute] = useState("")
+  const [isAddingCustomAttribute, setIsAddingCustomAttribute] = useState(false)
+
   // Initialize the form with default values or existing product data
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -273,6 +277,25 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
     const newTags = [...tags]
     newTags.splice(index, 1)
     setTags(newTags)
+  }
+
+  // Handle adding custom variant attribute
+  const handleAddCustomAttribute = () => {
+    if (newCustomAttribute.trim() && !variantAttributes?.includes(newCustomAttribute.trim())) {
+      const currentAttributes = form.getValues("variant_attributes") || []
+      form.setValue("variant_attributes", [...currentAttributes, newCustomAttribute.trim()])
+      setNewCustomAttribute("")
+      setIsAddingCustomAttribute(false)
+    }
+  }
+
+  // Handle removing variant attribute
+  const handleRemoveVariantAttribute = (attribute: string) => {
+    const currentAttributes = form.getValues("variant_attributes") || []
+    form.setValue(
+      "variant_attributes",
+      currentAttributes.filter((attr) => attr !== attribute),
+    )
   }
 
   // Upload images to Supabase storage
@@ -920,8 +943,31 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                   {form.watch("has_variants") && (
                     <div className="space-y-4 mt-4">
                       <div className="p-4 border rounded-md bg-muted/50">
-                        <h4 className="text-sm font-medium mb-2">Common Variant Attributes</h4>
-                        <div className="grid grid-cols-2 gap-2">
+                        <h4 className="text-sm font-medium mb-2">Variant Attributes</h4>
+
+                        {/* Selected variant attributes */}
+                        {variantAttributes && variantAttributes.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {variantAttributes.map((attr) => (
+                              <div
+                                key={attr}
+                                className="flex items-center bg-primary/10 px-3 py-1 rounded-full text-sm"
+                              >
+                                {attr}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveVariantAttribute(attr)}
+                                  className="ml-2 text-muted-foreground hover:text-foreground"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Common variant attributes */}
+                        <div className="grid grid-cols-2 gap-2 mb-4">
                           <div className="flex items-center space-x-2">
                             <Checkbox
                               id="attr-size"
@@ -995,6 +1041,50 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                             <Label htmlFor="attr-style">Style</Label>
                           </div>
                         </div>
+
+                        {/* Custom attribute input */}
+                        {isAddingCustomAttribute ? (
+                          <div className="space-y-2">
+                            <Input
+                              placeholder="Enter custom attribute (e.g. 'pattern', 'weight')"
+                              value={newCustomAttribute}
+                              onChange={(e) => setNewCustomAttribute(e.target.value)}
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault()
+                                  handleAddCustomAttribute()
+                                }
+                              }}
+                            />
+                            <div className="flex gap-2">
+                              <Button type="button" size="sm" onClick={handleAddCustomAttribute}>
+                                Save
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setIsAddingCustomAttribute(false)
+                                  setNewCustomAttribute("")
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsAddingCustomAttribute(true)}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Custom Attribute
+                          </Button>
+                        )}
                       </div>
 
                       {/* Variant Management Section */}

@@ -71,18 +71,21 @@ export default function ProductVariantForm({
   }
 
   const handleAttributeChange = (attribute: string, value: string) => {
-    console.log(`Changing attribute ${attribute} to ${value}`)
     setFormData((prev) => {
       const updatedAttributes = {
         ...prev.attributes,
         [attribute]: value,
       }
-      console.log("Updated attributes:", updatedAttributes)
       return {
         ...prev,
         attributes: updatedAttributes,
       }
     })
+  }
+
+  // Handle adding a custom attribute value
+  const handleCustomAttributeChange = (attribute: string, value: string) => {
+    handleAttributeChange(attribute, value)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -149,6 +152,17 @@ export default function ProductVariantForm({
     return Object.keys(attributeOptions).includes(attr.toLowerCase())
   }
 
+  // Helper to add a custom value to attribute options
+  const addCustomOption = (attr: string, value: string) => {
+    if (!attributeOptions[attr.toLowerCase()]) {
+      attributeOptions[attr.toLowerCase()] = []
+    }
+
+    if (!attributeOptions[attr.toLowerCase()].includes(value)) {
+      attributeOptions[attr.toLowerCase()].push(value)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -172,21 +186,54 @@ export default function ProductVariantForm({
               <div key={attr} className="space-y-2">
                 <Label htmlFor={`attr-${attr}`}>{attr.charAt(0).toUpperCase() + attr.slice(1)}</Label>
                 {hasPresetOptions(attr) ? (
-                  <Select
-                    value={formData.attributes[attr] || ""}
-                    onValueChange={(value) => handleAttributeChange(attr, value)}
-                  >
-                    <SelectTrigger id={`attr-${attr}`} className="w-full">
-                      <SelectValue placeholder={`Select ${attr}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {attributeOptions[attr.toLowerCase()]?.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Select
+                      value={formData.attributes[attr] || ""}
+                      onValueChange={(value) => {
+                        if (value === "custom") {
+                          // Show custom input field
+                          handleAttributeChange(attr, "")
+                        } else {
+                          handleAttributeChange(attr, value)
+                        }
+                      }}
+                    >
+                      <SelectTrigger id={`attr-${attr}`} className="w-full">
+                        <SelectValue placeholder={`Select ${attr}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {attributeOptions[attr.toLowerCase()]?.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">+ Add Custom {attr}</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {formData.attributes[attr] === "" && (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder={`Enter custom ${attr}`}
+                          value={formData.attributes[attr] || ""}
+                          onChange={(e) => handleCustomAttributeChange(attr, e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            const value = formData.attributes[attr]
+                            if (value && value.trim()) {
+                              addCustomOption(attr, value.trim())
+                            }
+                          }}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <Input
                     id={`attr-${attr}`}
