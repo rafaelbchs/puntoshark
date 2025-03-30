@@ -1,48 +1,8 @@
-import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronRight } from "lucide-react"
-import { getProducts } from "@/app/actions/inventory"
-import ProductGrid from "@/components/product-grid"
-
-// This is a placeholder component for when you don't have products yet
-function EmptyState({ category, gender }: { category: string; gender: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
-      <div className="rounded-full bg-muted p-6 mb-6">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-10 w-10 text-muted-foreground"
-        >
-          <path d="M21 13V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8" />
-          <line x1="16" x2="16" y1="2" y2="6" />
-          <line x1="8" x2="8" y1="2" y2="6" />
-          <line x1="3" x2="21" y1="10" y2="10" />
-          <path d="M16 19h6" />
-          <path d="M19 16v6" />
-        </svg>
-      </div>
-      <h2 className="text-2xl font-semibold tracking-tight">No products yet</h2>
-      <p className="mt-2 text-muted-foreground max-w-md">
-        We're working on adding {gender === "men" ? "men's" : gender === "women" ? "women's" : ""} {category} to our
-        collection. Check back soon!
-      </p>
-      <Link
-        href="/"
-        className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      >
-        Return to Home
-      </Link>
-    </div>
-  )
-}
+import Image from "next/image"
+import { getProductsByCategory } from "@/app/actions/inventory"
+import { formatCurrency } from "@/lib/utils"
+import { getProductCardImageUrl } from "@/lib/image-utils"
 
 export default async function CategoryPage({
   params,
@@ -51,104 +11,104 @@ export default async function CategoryPage({
 }) {
   const { gender, category } = params
 
-  // Validate the gender and category
-  const validGenders = ["men", "women", "accessories", "unisex", "kids"]
-  if (!validGenders.includes(gender)) {
-    return notFound()
-  }
-
-  // Format the category and gender for display
-  const formattedCategory = category
+  // Normalize the category from URL format (e.g., "t-shirts" to "T-Shirts")
+  const normalizedCategory = category
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ")
 
+  // For accessories, we need to handle them differently since they don't have a gender
+  const isAccessories = normalizedCategory.toLowerCase() === "accessories" || gender.toLowerCase() === "accessories"
+
+  // Fetch products by category
+  const products = await getProductsByCategory(
+    isAccessories ? "accessories" : normalizedCategory,
+    isAccessories ? undefined : gender,
+  )
+
+  // Format gender for display
   const formattedGender = gender.charAt(0).toUpperCase() + gender.slice(1)
 
-  // Fetch products for this category and gender
-  const products = await getProducts(false) // false means don't include discontinued products
-
-  // Format the category for comparison (convert from kebab-case to normal case)
-  const formattedSearchCategory = category.replace(/-/g, " ").toLowerCase()
-
-  // Debug logging
-  console.log(`Looking for products with gender: ${gender}, category: ${formattedSearchCategory}`)
-  console.log(`Total products before filtering: ${products.length}`)
-
-  // Filter products by gender and category - with more flexible matching
-  const filteredProducts = products.filter((product) => {
-    // For gender matching:
-    // 1. If product.gender is null, show in all genders except accessories
-    // 2. If gender is "accessories", match products with null gender or "accessories" gender
-    // 3. Otherwise, match the gender exactly (case insensitive)
-    let genderMatch = false
-
-    if (gender === "accessories") {
-      // For accessories, include products with null gender or "accessories" gender
-      genderMatch = !product.gender || product.gender.toLowerCase() === "accessories"
-    } else if (!product.gender) {
-      // For null gender products, include in all gender categories
-      genderMatch = true
-    } else {
-      // Normal gender matching (case insensitive)
-      genderMatch = product.gender.toLowerCase() === gender.toLowerCase()
-    }
-
-    // For category matching:
-    // 1. Convert both to lowercase for case-insensitive comparison
-    // 2. Check both category and subcategory
-    // 3. Handle special cases like "t-shirts" vs "tshirts" vs "t shirts"
-    const productCategory = (product.category || "").toLowerCase()
-    const productSubcategory = (product.subcategory || "").toLowerCase()
-
-    // Normalize categories by removing spaces and hyphens for comparison
-    const normalizedProductCategory = productCategory.replace(/[\s-]/g, "")
-    const normalizedProductSubcategory = productSubcategory.replace(/[\s-]/g, "")
-    const normalizedSearchCategory = formattedSearchCategory.replace(/[\s-]/g, "")
-
-    const categoryMatch =
-      productCategory === formattedSearchCategory ||
-      productSubcategory === formattedSearchCategory ||
-      normalizedProductCategory === normalizedSearchCategory ||
-      normalizedProductSubcategory === normalizedSearchCategory
-
-    // Debug logging for each product
-    console.log(`Product: ${product.name}, Gender: ${product.gender}, Category: ${product.category}`)
-    console.log(`Gender match: ${genderMatch}, Category match: ${categoryMatch}`)
-
-    return genderMatch && categoryMatch
-  })
-
-  console.log(`Found ${filteredProducts.length} products for ${gender}/${formattedSearchCategory}`)
+  // Determine the page title
+  const pageTitle = isAccessories ? "Accessories" : `${formattedGender}'s ${normalizedCategory}`
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="pt-24 pb-6 bg-muted">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center text-sm">
-            <Link href="/" className="text-muted-foreground hover:text-foreground">
-              Home
-            </Link>
-            <ChevronRight className="h-4 w-4 mx-2 text-muted-foreground" />
-            <Link href={`/collections/${gender}`} className="text-muted-foreground hover:text-foreground">
-              {formattedGender}
-            </Link>
-            <ChevronRight className="h-4 w-4 mx-2 text-muted-foreground" />
-            <span className="font-medium text-foreground">{formattedCategory}</span>
-          </div>
+      <div className="flex-1 pt-24">
+        <div className="container mx-auto px-4 py-8">
+          <h1 className="text-3xl font-bold mb-8">{pageTitle}</h1>
 
-          <h1 className="text-3xl font-bold mt-4">
-            {formattedGender}'s {formattedCategory}
-          </h1>
+          {products.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+              <div className="rounded-full bg-muted p-6 mb-6">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-10 w-10 text-muted-foreground"
+                >
+                  <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-semibold tracking-tight">No Products Found</h2>
+              <p className="mt-2 text-muted-foreground max-w-md">
+                We couldn't find any products in this category. Please check back later or explore other categories.
+              </p>
+              <Link
+                href="/"
+                className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Return to Home
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {products.map((product) => (
+                <Link
+                  key={product.id}
+                  href={`/products/${product.id}`}
+                  className="group overflow-hidden rounded-lg border hover:shadow-md transition-shadow"
+                >
+                  <div className="aspect-square overflow-hidden bg-gray-100">
+                    <Image
+                      src={
+                        product.images?.[0]
+                          ? getProductCardImageUrl(product.images[0])
+                          : "/placeholder.svg?height=400&width=400"
+                      }
+                      alt={product.name}
+                      width={400}
+                      height={400}
+                      className="h-full w-full object-cover object-center transition-transform group-hover:scale-105"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-medium">{product.name}</h3>
+                    <div className="mt-1 flex items-center justify-between">
+                      <p className="text-sm font-medium">{formatCurrency(product.price)}</p>
+                      {product.compareAtPrice && product.compareAtPrice > product.price && (
+                        <p className="text-sm text-muted-foreground line-through">
+                          {formatCurrency(product.compareAtPrice)}
+                        </p>
+                      )}
+                    </div>
+                    {product.hasVariants && (
+                      <p className="mt-1 text-xs text-muted-foreground">Multiple options available</p>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
-
-      <div className="flex-1 container mx-auto px-4 py-8">
-        {filteredProducts.length > 0 ? (
-          <ProductGrid products={filteredProducts} />
-        ) : (
-          <EmptyState category={formattedCategory.toLowerCase()} gender={gender} />
-        )}
       </div>
     </div>
   )

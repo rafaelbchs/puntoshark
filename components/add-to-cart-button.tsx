@@ -2,29 +2,43 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 import { useCart } from "@/context/cart-context"
+import { toast } from "@/hooks/use-toast"
+import type { Product } from "@/types/inventory"
 
-export function AddToCartButton({ product }) {
+interface AddToCartButtonProps {
+  product: Product
+}
+
+export function AddToCartButton({ product }: AddToCartButtonProps) {
+  const [isAddingToCart, setIsAddingToCart] = useState(false)
   const { addItem } = useCart()
-  const [isAdding, setIsAdding] = useState(false)
 
-  const handleAddToCart = async () => {
-    setIsAdding(true)
+  const handleAddToCart = () => {
+    setIsAddingToCart(true)
 
     try {
-      await addItem({
+      addItem({
         id: product.id,
         name: product.name,
         price: product.price,
-        image: product.images?.[0] || "/placeholder.svg",
-        quantity: 1,
+        image: product.images?.[0] || "",
       })
 
-      // Optional: Show success message
+      toast({
+        title: "Added to cart",
+        description: `${product.name} has been added to your cart`,
+      })
     } catch (error) {
-      console.error("Failed to add item to cart:", error)
+      console.error("Error adding to cart:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive",
+      })
     } finally {
-      setIsAdding(false)
+      setIsAddingToCart(false)
     }
   }
 
@@ -32,10 +46,18 @@ export function AddToCartButton({ product }) {
     <Button
       size="lg"
       className="w-full"
-      disabled={product.inventory?.status === "out_of_stock" || isAdding}
+      disabled={product.inventory.status === "out_of_stock" || isAddingToCart}
       onClick={handleAddToCart}
     >
-      {product.inventory?.status === "out_of_stock" ? "Out of Stock" : isAdding ? "Adding..." : "Add to Cart"}
+      {isAddingToCart ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...
+        </>
+      ) : product.inventory.status === "out_of_stock" ? (
+        "Out of Stock"
+      ) : (
+        "Add to Cart"
+      )}
     </Button>
   )
 }

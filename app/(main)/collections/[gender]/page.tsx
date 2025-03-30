@@ -1,126 +1,138 @@
-import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronRight } from "lucide-react"
-import { getProducts, getCategories } from "@/app/actions/inventory"
-import ProductGrid from "@/components/product-grid"
+import Image from "next/image"
+import { getCategories, getProductsByCategory } from "@/app/actions/inventory"
 
-// This is a placeholder component for when you don't have products yet
-function EmptyState({ gender }: { gender: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
-      <div className="rounded-full bg-muted p-6 mb-6">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-10 w-10 text-muted-foreground"
-        >
-          <path d="M21 13V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8" />
-          <line x1="16" x2="16" y1="2" y2="6" />
-          <line x1="8" x2="8" y1="2" y2="6" />
-          <line x1="3" x2="21" y1="10" y2="10" />
-          <path d="M16 19h6" />
-          <path d="M19 16v6" />
-        </svg>
-      </div>
-      <h2 className="text-2xl font-semibold tracking-tight">No products yet</h2>
-      <p className="mt-2 text-muted-foreground max-w-md">
-        We're working on adding {gender === "men" ? "men's" : gender === "women" ? "women's" : ""} products to our
-        collection. Check back soon!
-      </p>
-      <Link
-        href="/"
-        className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      >
-        Return to Home
-      </Link>
-    </div>
-  )
-}
-
-export default async function GenderPage({
+export default async function GenderCollectionPage({
   params,
 }: {
   params: { gender: string }
 }) {
   const { gender } = params
 
-  // Validate the gender
-  const validGenders = ["men", "women", "accessories", "unisex", "kids"]
-  if (!validGenders.includes(gender)) {
-    return notFound()
-  }
-
-  // Format the gender for display
+  // Format gender for display
   const formattedGender = gender.charAt(0).toUpperCase() + gender.slice(1)
 
-  // Fetch products for this gender
-  const products = await getProducts()
+  // Special case for accessories
+  const isAccessories = gender.toLowerCase() === "accessories"
 
-  // Fetch categories to display subcategory links
+  // Get all categories
   const categories = await getCategories()
 
-  // Filter products by gender
-  const filteredProducts = products.filter((product) => {
-    // For gender matching:
-    // 1. If product.gender is null, show in all genders except accessories
-    // 2. If gender is "accessories", match products with null gender or "accessories" gender
-    // 3. Otherwise, match the gender exactly (case insensitive)
-    if (gender === "accessories") {
-      return !product.gender || product.gender.toLowerCase() === "accessories"
-    } else if (!product.gender) {
-      return true
-    } else {
-      return product.gender.toLowerCase() === gender.toLowerCase()
-    }
-  })
+  // Filter categories based on products that exist for this gender
+  let filteredCategories = []
 
-  // Get unique categories from the filtered products
-  const uniqueCategories = [...new Set(filteredProducts.map((product) => product.category))].filter(Boolean)
+  if (isAccessories) {
+    // For accessories page, we'll just show accessories
+    // First check if we have an accessories category
+    const accessoriesCategory = categories.find((cat) => cat.name.toLowerCase() === "accessories")
+
+    if (accessoriesCategory) {
+      filteredCategories = [accessoriesCategory]
+    } else {
+      // If no accessories category exists yet, create a placeholder
+      filteredCategories = [
+        {
+          name: "Accessories",
+          subcategories: [],
+        },
+      ]
+    }
+
+    // Also check if we have any accessories products
+    const accessoriesProducts = await getProductsByCategory("Accessories")
+    if (accessoriesProducts.length === 0 && filteredCategories.length > 0) {
+      filteredCategories[0].hasProducts = false
+    } else if (accessoriesProducts.length > 0) {
+      filteredCategories[0].hasProducts = true
+    }
+  } else {
+    // For gender-specific pages, we'll show all categories that have products
+    const categoryPromises = categories.map(async (category) => {
+      const products = await getProductsByCategory(category.name, gender)
+      return {
+        ...category,
+        hasProducts: products.length > 0,
+      }
+    })
+
+    const categoriesWithProductCheck = await Promise.all(categoryPromises)
+    filteredCategories = categoriesWithProductCheck.filter((cat) => cat.hasProducts)
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="pt-24 pb-6 bg-muted">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center text-sm">
-            <Link href="/" className="text-muted-foreground hover:text-foreground">
-              Home
-            </Link>
-            <ChevronRight className="h-4 w-4 mx-2 text-muted-foreground" />
-            <span className="font-medium text-foreground">{formattedGender}</span>
-          </div>
+      <div className="flex-1 pt-24">
+        <div className="container mx-auto px-4 py-8">
+          <h1 className="text-3xl font-bold mb-8">
+            {isAccessories ? "Accessories" : `${formattedGender}'s Collection`}
+          </h1>
 
-          <h1 className="text-3xl font-bold mt-4">{formattedGender}'s Collection</h1>
+          {filteredCategories.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+              <div className="rounded-full bg-muted p-6 mb-6">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-10 w-10 text-muted-foreground"
+                >
+                  <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-semibold tracking-tight">No Categories Found</h2>
+              <p className="mt-2 text-muted-foreground max-w-md">
+                We couldn't find any categories for this collection. Please check back later.
+              </p>
+              <Link
+                href="/"
+                className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Return to Home
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredCategories.map((category) => {
+                // Create URL-friendly category name
+                const categorySlug = category.name.toLowerCase().replace(/\s+/g, "-")
 
-          {/* Category links */}
-          {uniqueCategories.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {uniqueCategories.map((category) => {
-                // Convert category to kebab-case for URL
-                const categorySlug = category?.toLowerCase().replace(/\s+/g, "-")
                 return (
                   <Link
-                    key={category}
+                    key={category.name}
                     href={`/collections/${gender}/${categorySlug}`}
-                    className="px-3 py-1 bg-background rounded-full text-sm hover:bg-primary hover:text-primary-foreground transition-colors"
+                    className="group overflow-hidden rounded-lg border hover:shadow-md transition-shadow"
                   >
-                    {category}
+                    <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                      <Image
+                        src="/placeholder.svg?height=600&width=800"
+                        alt={category.name}
+                        width={800}
+                        height={600}
+                        className="h-full w-full object-cover object-center transition-transform group-hover:scale-105"
+                      />
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-xl font-medium">{category.name}</h3>
+                      <p className="mt-1 text-muted-foreground">
+                        {category.subcategories.length > 0
+                          ? `${category.subcategories.length} subcategories`
+                          : "Explore our collection"}
+                      </p>
+                    </div>
                   </Link>
                 )
               })}
             </div>
           )}
         </div>
-      </div>
-
-      <div className="flex-1 container mx-auto px-4 py-8">
-        {filteredProducts.length > 0 ? <ProductGrid products={filteredProducts} /> : <EmptyState gender={gender} />}
       </div>
     </div>
   )

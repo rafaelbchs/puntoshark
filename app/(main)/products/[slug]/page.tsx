@@ -3,7 +3,7 @@ import Image from "next/image"
 import { ChevronRight } from "lucide-react"
 import { getProductById } from "@/app/actions/inventory"
 import { getProductDetailImageUrl } from "@/lib/image-utils"
-import { AddToCartButton } from "@/components/add-to-cart-button"
+import { ProductVariantSelector } from "@/components/product-variant-selector"
 
 export default async function ProductPage({
   params,
@@ -145,6 +145,11 @@ export default async function ProductPage({
               </div>
             </div>
 
+            {/* Variant Selector */}
+            {product.hasVariants && product.variantAttributes && product.variantAttributes.length > 0 && (
+              <ProductVariantSelector product={product} />
+            )}
+
             {/* Inventory Status */}
             <div>
               {product.inventory.status === "in_stock" && (
@@ -159,11 +164,6 @@ export default async function ProductPage({
               {product.inventory.status === "discontinued" && (
                 <p className="text-sm text-gray-600 font-medium">Discontinued</p>
               )}
-            </div>
-
-            {/* Add to Cart Button */}
-            <div className="pt-4">
-              <AddToCartButton product={product} />
             </div>
 
             {/* Product Metadata */}
