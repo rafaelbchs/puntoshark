@@ -121,14 +121,14 @@ export function ProductVariantSelector({ product }: ProductVariantSelectorProps)
       })
 
       toast({
-        title: "Added to cart",
-        description: `${product.name} (${formatVariantName(selectedVariant.attributes)}) has been added to your cart`,
+        title: "Añadido al carrito",
+        description: `${product.name} (${formatVariantName(selectedVariant.attributes)}) ha sido añadido a tu carrito`,
       })
     } catch (error) {
       console.error("Error adding to cart:", error)
       toast({
         title: "Error",
-        description: "Failed to add item to cart",
+        description: "No se pudo añadir el artículo al carrito",
         variant: "destructive",
       })
     } finally {
@@ -143,11 +143,27 @@ export function ProductVariantSelector({ product }: ProductVariantSelectorProps)
       .join(", ")
   }
 
+  // Translate attribute names
+  const getAttributeLabel = (attribute: string) => {
+    switch (attribute.toLowerCase()) {
+      case "size":
+        return "Talla"
+      case "color":
+        return "Color"
+      case "material":
+        return "Material"
+      case "style":
+        return "Estilo"
+      default:
+        return attribute.charAt(0).toUpperCase() + attribute.slice(1)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        <span>Loading variants...</span>
+        <span>Cargando variantes...</span>
       </div>
     )
   }
@@ -169,14 +185,14 @@ export function ProductVariantSelector({ product }: ProductVariantSelectorProps)
                 image: product.images?.[0] || "",
               })
               toast({
-                title: "Added to cart",
-                description: `${product.name} has been added to your cart`,
+                title: "Añadido al carrito",
+                description: `${product.name} ha sido añadido a tu carrito`,
               })
             } catch (error) {
               console.error("Error adding to cart:", error)
               toast({
                 title: "Error",
-                description: "Failed to add item to cart",
+                description: "No se pudo añadir el artículo al carrito",
                 variant: "destructive",
               })
             } finally {
@@ -186,12 +202,12 @@ export function ProductVariantSelector({ product }: ProductVariantSelectorProps)
         >
           {isAddingToCart ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Añadiendo...
             </>
           ) : product.inventory.status === "out_of_stock" ? (
-            "Out of Stock"
+            "Agotado"
           ) : (
-            "Add to Cart"
+            "Añadir al Carrito"
           )}
         </Button>
       </div>
@@ -202,7 +218,7 @@ export function ProductVariantSelector({ product }: ProductVariantSelectorProps)
     <div className="space-y-6">
       {product.variantAttributes?.map((attribute) => (
         <div key={attribute} className="space-y-3">
-          <Label className="text-base font-medium">{attribute.charAt(0).toUpperCase() + attribute.slice(1)}</Label>
+          <Label className="text-base font-medium">{getAttributeLabel(attribute)}</Label>
           <RadioGroup
             value={selectedAttributes[attribute] || ""}
             onValueChange={(value) => handleAttributeChange(attribute, value)}
@@ -253,12 +269,12 @@ export function ProductVariantSelector({ product }: ProductVariantSelectorProps)
           >
             {isAddingToCart ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Añadiendo...
               </>
             ) : selectedVariant.inventory.status === "out_of_stock" ? (
-              "Out of Stock"
+              "Agotado"
             ) : (
-              "Add to Cart"
+              "Añadir al Carrito"
             )}
           </Button>
         </div>
@@ -266,4 +282,3 @@ export function ProductVariantSelector({ product }: ProductVariantSelectorProps)
     </div>
   )
 }
-

@@ -40,15 +40,15 @@ export default async function ProductPage({
                   <line x1="12" x2="12.01" y1="16" y2="16" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-semibold tracking-tight">Product Not Found</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">Producto No Encontrado</h2>
               <p className="mt-2 text-muted-foreground max-w-md">
-                We couldn't find the product you're looking for. It may have been removed or doesn't exist yet.
+                No pudimos encontrar el producto que estás buscando. Puede que haya sido eliminado o no exista todavía.
               </p>
               <Link
                 href="/"
                 className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
-                Return to Home
+                Volver al Inicio
               </Link>
             </div>
           </div>
@@ -58,7 +58,7 @@ export default async function ProductPage({
   }
 
   // Format gender for breadcrumb
-  const formattedGender = product.gender ? product.gender.charAt(0).toUpperCase() + product.gender.slice(1) : "Products"
+  const formattedGender = getGenderText(product.gender)
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -66,7 +66,7 @@ export default async function ProductPage({
         <div className="container mx-auto px-4">
           <div className="flex items-center text-sm">
             <Link href="/" className="text-muted-foreground hover:text-foreground">
-              Home
+              Inicio
             </Link>
             <ChevronRight className="h-4 w-4 mx-2 text-muted-foreground" />
             {product.gender && (
@@ -116,7 +116,7 @@ export default async function ProductPage({
                   <div key={index} className="aspect-square overflow-hidden rounded-lg bg-gray-100">
                     <Image
                       src={getProductDetailImageUrl(image) || "/placeholder.svg"}
-                      alt={`${product.name} - Image ${index + 2}`}
+                      alt={`${product.name} - Imagen ${index + 2}`}
                       width={200}
                       height={200}
                       className="h-full w-full object-cover object-center"
@@ -153,16 +153,16 @@ export default async function ProductPage({
             {/* Inventory Status */}
             <div>
               {product.inventory.status === "in_stock" && (
-                <p className="text-sm text-green-600 font-medium">In Stock</p>
+                <p className="text-sm text-green-600 font-medium">En Stock</p>
               )}
               {product.inventory.status === "low_stock" && (
-                <p className="text-sm text-amber-600 font-medium">Low Stock</p>
+                <p className="text-sm text-amber-600 font-medium">Pocas Unidades</p>
               )}
               {product.inventory.status === "out_of_stock" && (
-                <p className="text-sm text-red-600 font-medium">Out of Stock</p>
+                <p className="text-sm text-red-600 font-medium">Agotado</p>
               )}
               {product.inventory.status === "discontinued" && (
-                <p className="text-sm text-gray-600 font-medium">Discontinued</p>
+                <p className="text-sm text-gray-600 font-medium">Descontinuado</p>
               )}
             </div>
 
@@ -173,17 +173,17 @@ export default async function ProductPage({
               </p>
               {product.category && (
                 <p>
-                  <span className="font-medium">Category:</span> {product.category}
+                  <span className="font-medium">Categoría:</span> {product.category}
                 </p>
               )}
               {product.subcategory && (
                 <p>
-                  <span className="font-medium">Subcategory:</span> {product.subcategory}
+                  <span className="font-medium">Subcategoría:</span> {product.subcategory}
                 </p>
               )}
               {product.tags && product.tags.length > 0 && (
                 <p>
-                  <span className="font-medium">Tags:</span> {product.tags.join(", ")}
+                  <span className="font-medium">Etiquetas:</span> {product.tags.join(", ")}
                 </p>
               )}
             </div>
@@ -194,3 +194,18 @@ export default async function ProductPage({
   )
 }
 
+// Helper function to translate gender
+function getGenderText(gender?: string): string {
+  if (!gender) return "Productos"
+
+  switch (gender.toLowerCase()) {
+    case "men":
+      return "Hombres"
+    case "women":
+      return "Mujeres"
+    case "unisex":
+      return "Unisex"
+    default:
+      return gender.charAt(0).toUpperCase() + gender.slice(1)
+  }
+}

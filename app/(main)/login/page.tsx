@@ -31,10 +31,10 @@ export default function LoginPage() {
         router.push("/admin/dashboard")
         router.refresh()
       } else {
-        setError(result.error || "Login failed")
+        setError(result.error || "Error de inicio de sesión")
       }
     } catch (err) {
-      setError("An unexpected error occurred")
+      setError("Ocurrió un error inesperado")
       console.error(err)
     } finally {
       setLoading(false)
@@ -45,8 +45,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-center text-2xl font-bold">Admin Login</CardTitle>
-          <CardDescription className="text-center">Sign in to access the admin dashboard</CardDescription>
+          <CardTitle className="text-center text-2xl font-bold">Inicio de Sesión Admin</CardTitle>
+          <CardDescription className="text-center">
+            Inicia sesión para acceder al panel de administración
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {error && (
@@ -57,7 +59,7 @@ export default function LoginPage() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Usuario</Label>
               <Input
                 id="username"
                 type="text"
@@ -68,7 +70,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Contraseña</Label>
               <Input
                 id="password"
                 type="password"
@@ -79,15 +81,14 @@ export default function LoginPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="text-center text-sm text-gray-500">
-          This is a secure area. Only authorized personnel should attempt to login.
+          Esta es un área segura. Solo el personal autorizado debe intentar iniciar sesión.
         </CardFooter>
       </Card>
     </div>
   )
 }
-

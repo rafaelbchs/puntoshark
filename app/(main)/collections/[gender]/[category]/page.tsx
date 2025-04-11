@@ -30,7 +30,7 @@ export default async function CategoryPage({
   const formattedGender = gender.charAt(0).toUpperCase() + gender.slice(1)
 
   // Determine the page title
-  const pageTitle = isAccessories ? "Accessories" : `${formattedGender}'s ${normalizedCategory}`
+  const pageTitle = isAccessories ? "Accesorios" : `${getGenderText(formattedGender)} ${normalizedCategory}`
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -54,19 +54,20 @@ export default async function CategoryPage({
                   className="h-10 w-10 text-muted-foreground"
                 >
                   <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-                  <path d="M16 11.37A4 4 0 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
                   <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-semibold tracking-tight">No Products Found</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">No se encontraron productos</h2>
               <p className="mt-2 text-muted-foreground max-w-md">
-                We couldn't find any products in this category. Please check back later or explore other categories.
+                No pudimos encontrar productos en esta categoría. Por favor, vuelve más tarde o explora otras
+                categorías.
               </p>
               <Link
                 href="/"
                 className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
-                Return to Home
+                Volver al Inicio
               </Link>
             </div>
           ) : (
@@ -101,7 +102,7 @@ export default async function CategoryPage({
                       )}
                     </div>
                     {product.hasVariants && (
-                      <p className="mt-1 text-xs text-muted-foreground">Multiple options available</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Múltiples opciones disponibles</p>
                     )}
                   </div>
                 </Link>
@@ -114,3 +115,16 @@ export default async function CategoryPage({
   )
 }
 
+// Helper function to translate gender
+function getGenderText(gender: string): string {
+  switch (gender.toLowerCase()) {
+    case "men":
+      return "Hombres"
+    case "women":
+      return "Mujeres"
+    case "unisex":
+      return "Unisex"
+    default:
+      return gender
+  }
+}

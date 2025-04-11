@@ -15,15 +15,15 @@ export default function CartPage() {
   if (items.length === 0) {
     return (
       <div className="container mx-auto py-16 px-4">
-        <h1 className="text-3xl font-bold mb-8">Your Cart</h1>
+        <h1 className="text-3xl font-bold mb-8">Tu Carrito</h1>
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="mb-6 rounded-full bg-muted p-6">
             <ShoppingBag className="h-10 w-10 text-muted-foreground" />
           </div>
-          <h2 className="text-2xl font-semibold mb-2">Your cart is empty</h2>
-          <p className="text-muted-foreground mb-6">Looks like you haven't added anything to your cart yet.</p>
+          <h2 className="text-2xl font-semibold mb-2">Tu carrito está vacío</h2>
+          <p className="text-muted-foreground mb-6">Parece que aún no has añadido nada a tu carrito.</p>
           <Link href="/" passHref>
-            <Button>Continue Shopping</Button>
+            <Button>Continuar Comprando</Button>
           </Link>
         </div>
       </div>
@@ -33,7 +33,7 @@ export default function CartPage() {
   return (
     <div className="container mx-auto py-8 px-4 md:py-16">
       <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">
-        Your Cart ({totalItems} {totalItems === 1 ? "item" : "items"})
+        Tu Carrito ({totalItems} {totalItems === 1 ? "artículo" : "artículos"})
       </h1>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -101,9 +101,9 @@ export default function CartPage() {
           {/* Desktop view - Table-like layout */}
           <div className="hidden lg:block border rounded-lg overflow-hidden">
             <div className="grid grid-cols-12 bg-muted p-4 text-sm font-medium">
-              <div className="col-span-6">Product</div>
-              <div className="col-span-2 text-center">Quantity</div>
-              <div className="col-span-3 text-right">Price</div>
+              <div className="col-span-6">Producto</div>
+              <div className="col-span-2 text-center">Cantidad</div>
+              <div className="col-span-3 text-right">Precio</div>
               <div className="col-span-1"></div>
             </div>
 
@@ -171,15 +171,15 @@ export default function CartPage() {
           <div className="sticky top-4">
             <Card>
               <CardContent className="p-6">
-                <h2 className="text-lg font-bold mb-4">Order Summary</h2>
+                <h2 className="text-lg font-bold mb-4">Resumen del Pedido</h2>
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
                     <span>${subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Shipping</span>
-                    <span>Calculated at checkout</span>
+                    <span>Envío</span>
+                    <span>Calculado al finalizar la compra</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold">
@@ -188,12 +188,12 @@ export default function CartPage() {
                   </div>
 
                   <Link href="/checkout" passHref>
-                    <Button className="w-full mt-2">Proceed to Checkout</Button>
+                    <Button className="w-full mt-2">Proceder al Pago</Button>
                   </Link>
 
                   <div className="text-center mt-4">
                     <Link href="/" className="text-sm text-primary hover:underline">
-                      Continue Shopping
+                      Continuar Comprando
                     </Link>
                   </div>
                 </div>
@@ -205,4 +205,3 @@ export default function CartPage() {
     </div>
   )
 }
-

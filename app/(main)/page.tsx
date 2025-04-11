@@ -11,7 +11,7 @@ export default function Home() {
         <div className="absolute inset-0">
           <Image
             src="/placeholder.svg?height=1080&width=1920"
-            alt="Hero background"
+            alt="Imagen de fondo"
             fill
             className="object-cover"
             priority
@@ -21,25 +21,25 @@ export default function Home() {
         <div className="relative flex h-full items-center justify-start text-left px-4 sm:px-6 lg:px-8 lg:max-w-7xl lg:mx-auto">
           <div className="max-w-xl">
             <h1 className="text-5xl font-bold tracking-tight text-white sm:text-6xl md:text-7xl uppercase">
-              Performance
+              Colección
               <br />
-              Collection
+              Performance
             </h1>
-            <p className="mt-6 text-xl text-white">Engineered for athletes, designed for everyone.</p>
+            <p className="mt-6 text-xl text-white">Diseñada para atletas, creada para todos.</p>
             <div className="mt-10">
               <Button
                 asChild
                 size="lg"
                 className="text-base bg-white text-black hover:bg-white/90 rounded-none px-8 py-6"
               >
-                <Link href="/collections/men">SHOP MEN</Link>
+                <Link href="/collections/men">HOMBRES</Link>
               </Button>
               <Button
                 asChild
                 size="lg"
                 className="text-base bg-white text-black hover:bg-white/90 rounded-none px-8 py-6 ml-4"
               >
-                <Link href="/collections/women">SHOP WOMEN</Link>
+                <Link href="/collections/women">MUJERES</Link>
               </Button>
             </div>
           </div>
@@ -49,17 +49,21 @@ export default function Home() {
       {/* Featured Categories */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="mx-auto max-w-7xl">
-          <h2 className="text-3xl font-bold tracking-tight text-black mb-12 uppercase">Shop by Category</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-black mb-12 uppercase">Comprar por Categoría</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { name: "Men's Collection", href: "/collections/men", image: "/placeholder.svg?height=600&width=400" },
               {
-                name: "Women's Collection",
+                name: "Colección para Hombres",
+                href: "/collections/men",
+                image: "/placeholder.svg?height=600&width=400",
+              },
+              {
+                name: "Colección para Mujeres",
                 href: "/collections/women",
                 image: "/placeholder.svg?height=600&width=400",
               },
-              { name: "Accessories", href: "/collections/accessories", image: "/placeholder.svg?height=600&width=400" },
+              { name: "Accesorios", href: "/collections/accessories", image: "/placeholder.svg?height=600&width=400" },
             ].map((category) => (
               <Link key={category.name} href={category.href} className="group relative overflow-hidden">
                 <div className="aspect-h-4 aspect-w-3 w-full overflow-hidden">
@@ -74,7 +78,7 @@ export default function Home() {
                 <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 to-transparent">
                   <h3 className="text-xl font-semibold text-white uppercase">{category.name}</h3>
                   <p className="mt-2 text-sm text-white flex items-center">
-                    Shop Now <ChevronRight className="h-4 w-4 ml-1" />
+                    Comprar Ahora <ChevronRight className="h-4 w-4 ml-1" />
                   </p>
                 </div>
               </Link>
@@ -87,9 +91,9 @@ export default function Home() {
       <section className="py-20 bg-[#f9f9f9]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-12">
-            <h2 className="text-3xl font-bold tracking-tight text-black uppercase">New Arrivals</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-black uppercase">Nuevos Productos</h2>
             <Link href="/collections/new-arrivals" className="text-black hover:underline font-medium flex items-center">
-              View All <ChevronRight className="h-4 w-4 ml-1" />
+              Ver Todo <ChevronRight className="h-4 w-4 ml-1" />
             </Link>
           </div>
 
@@ -97,28 +101,28 @@ export default function Home() {
             {[
               {
                 id: 1,
-                name: "Performance Tee",
+                name: "Camiseta Performance",
                 price: "$35",
                 href: "/products/performance-tee",
                 image: "/placeholder.svg?height=400&width=300",
               },
               {
                 id: 2,
-                name: "Training Shorts",
+                name: "Shorts de Entrenamiento",
                 price: "$45",
                 href: "/products/training-shorts",
                 image: "/placeholder.svg?height=400&width=300",
               },
               {
                 id: 3,
-                name: "Seamless Leggings",
+                name: "Leggins Sin Costuras",
                 price: "$65",
                 href: "/products/seamless-leggings",
                 image: "/placeholder.svg?height=400&width=300",
               },
               {
                 id: 4,
-                name: "Training Sports Bra",
+                name: "Top Deportivo",
                 price: "$40",
                 href: "/products/training-sports-bra",
                 image: "/placeholder.svg?height=400&width=300",
@@ -134,7 +138,7 @@ export default function Home() {
                     className="h-full w-full object-cover object-center group-hover:opacity-90 transition-opacity"
                   />
                   <div className="opacity-0 group-hover:opacity-100 absolute inset-0 flex items-center justify-center transition-opacity">
-                    <Button className="bg-white text-black hover:bg-white/90 rounded-none">Quick Add</Button>
+                    <Button className="bg-white text-black hover:bg-white/90 rounded-none">Añadir Rápido</Button>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -155,21 +159,21 @@ export default function Home() {
       {/* Featured Collection Banner */}
       <section className="relative py-32">
         <div className="absolute inset-0">
-          <Image src="/placeholder.svg?height=800&width=1920" alt="Featured collection" fill className="object-cover" />
+          <Image src="/placeholder.svg?height=800&width=1920" alt="Colección destacada" fill className="object-cover" />
         </div>
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col items-start justify-center">
           <div className="max-w-xl">
             <h2 className="text-4xl font-bold tracking-tight text-white uppercase">
-              The Training
+              Colección
               <br />
-              Collection
+              Entrenamiento
             </h2>
             <p className="mt-4 text-lg text-white">
-              Engineered for maximum performance and comfort during your most intense workouts.
+              Diseñada para máximo rendimiento y comodidad durante tus entrenamientos más intensos.
             </p>
             <Button asChild className="mt-8 bg-white text-black hover:bg-white/90 rounded-none px-8 py-6">
-              <Link href="/collections/training">SHOP THE COLLECTION</Link>
+              <Link href="/collections/training">COMPRAR LA COLECCIÓN</Link>
             </Button>
           </div>
         </div>
@@ -179,20 +183,24 @@ export default function Home() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="mx-auto max-w-7xl">
           <h2 className="text-3xl font-bold tracking-tight text-black uppercase text-center mb-4">@PuntoShark</h2>
-          <p className="text-base text-gray-600 text-center mb-12">Tag us on Instagram for a chance to be featured</p>
+          <p className="text-base text-gray-600 text-center mb-12">
+            Etiquétanos en Instagram para aparecer en nuestra galería
+          </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             {Array.from({ length: 6 }).map((_, i) => (
               <Link key={i} href="https://instagram.com" className="group relative aspect-square overflow-hidden">
                 <Image
                   src={`/placeholder.svg?height=300&width=300&text=Instagram+${i + 1}`}
-                  alt={`Instagram post ${i + 1}`}
+                  alt={`Publicación de Instagram ${i + 1}`}
                   width={300}
                   height={300}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                  <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity">View Post</span>
+                  <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    Ver Publicación
+                  </span>
                 </div>
               </Link>
             ))}
@@ -203,19 +211,20 @@ export default function Home() {
       {/* Newsletter */}
       <section className="py-16 bg-black text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl font-bold uppercase mb-4">Join the PuntoShark Community</h2>
+          <h2 className="text-2xl font-bold uppercase mb-4">Únete a la Comunidad PuntoShark</h2>
           <p className="text-gray-300 mb-8 max-w-2xl mx-auto">
-            Sign up to our newsletter to receive exclusive offers, early access to new releases, and training tips.
+            Suscríbete a nuestro boletín para recibir ofertas exclusivas, acceso anticipado a nuevos lanzamientos y
+            consejos de entrenamiento.
           </p>
 
           <form className="flex flex-col sm:flex-row max-w-md mx-auto gap-3">
             <input
               type="email"
-              placeholder="Your email address"
+              placeholder="Tu dirección de email"
               className="flex-1 px-4 py-3 bg-white/10 border border-white/20 text-white placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-white"
             />
             <Button type="submit" className="bg-white text-black hover:bg-white/90 rounded-none">
-              SUBSCRIBE
+              SUSCRIBIRSE
             </Button>
           </form>
         </div>
@@ -223,4 +232,3 @@ export default function Home() {
     </main>
   )
 }
-
