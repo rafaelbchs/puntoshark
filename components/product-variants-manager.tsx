@@ -326,4 +326,3 @@ export default function ProductVariantsManager({ product }: ProductVariantsManag
     </div>
   )
 }
-

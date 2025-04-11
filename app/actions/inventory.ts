@@ -671,8 +671,11 @@ export async function getProductsByCategory(category: string, gender?: string): 
   const supabase = getSupabase()
   let query = supabase.from("products").select("*").order("created_at", { ascending: false })
 
+  // Filter out discontinued products
+  query = query.neq("inventory_status", "discontinued")
+
   // For accessories, we need to handle them differently
-  if (category.toLowerCase() === "accessories" || gender === "accessories") {
+  if (category.toLowerCase() === "accessories" || category.toLowerCase() === "accesorios" || gender === "accessories") {
     // Use product_type for accessories instead of category
     query = query.eq("product_type", "accessories")
   } else {
@@ -681,7 +684,7 @@ export async function getProductsByCategory(category: string, gender?: string): 
 
     // If gender is provided, filter by gender
     if (gender && gender !== "accessories") {
-      query = query.eq("gender", gender)
+      query = query.eq("gender", gender.toLowerCase())
     }
   }
 
