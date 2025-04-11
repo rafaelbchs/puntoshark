@@ -50,6 +50,7 @@ export default async function GenderCollectionPage({
   } else {
     // For gender-specific pages, we'll show all categories that have products
     const categoryPromises = categories.map(async (category) => {
+      // Get products for this category and gender, excluding discontinued products
       const products = await getProductsByCategory(category.name, gender)
       return {
         ...category,

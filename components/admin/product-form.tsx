@@ -445,6 +445,49 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
   return (
     <form onSubmit={form.handleSubmit(onSubmit)}>
       <div className="space-y-6">
+        <Card className="bg-blue-50 border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-blue-800">Guía para categorizar productos correctamente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-blue-700 space-y-2">
+              <p>
+                <strong>Género:</strong> Usa "men" para hombres, "women" para mujeres, "unisex" para ambos.
+              </p>
+              <p>
+                <strong>Categoría:</strong> Asegúrate de que coincida exactamente con el nombre en la tabla de
+                categorías.
+              </p>
+              <p>
+                <strong>Tipo de producto:</strong> Usa "clothing" para ropa, "accessories" para accesorios.
+              </p>
+              <p>
+                <strong>Estado de inventario:</strong> Los productos "discontinued" no aparecerán en ninguna colección.
+              </p>
+              <p className="italic">
+                Pasa el cursor sobre los iconos de ayuda{" "}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="lucide lucide-help-circle inline"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                  <path d="M12 17h.01" />
+                </svg>{" "}
+                para más información.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs defaultValue="basic" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
@@ -476,24 +519,61 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="productType">Product Type</Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="productType">Tipo de Producto</Label>
+                      <div className="relative group">
+                        <span className="cursor-help text-muted-foreground">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="lucide lucide-help-circle"
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                            <path d="M12 17h.01" />
+                          </svg>
+                        </span>
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-2 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                          <p>
+                            <strong>clothing</strong>: Para prendas de vestir
+                          </p>
+                          <p>
+                            <strong>shoes</strong>: Para calzado
+                          </p>
+                          <p>
+                            <strong>accessories</strong>: Para accesorios
+                          </p>
+                          <p>Para accesorios, usa "accessories" y establece la categoría como "Accesorios".</p>
+                        </div>
+                      </div>
+                    </div>
                     <Select
                       onValueChange={(value) => form.setValue("productType", value)}
                       defaultValue={form.getValues("productType") || ""}
                     >
                       <SelectTrigger id="productType">
-                        <SelectValue placeholder="Select product type" />
+                        <SelectValue placeholder="Seleccionar tipo de producto" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="clothing">Clothing</SelectItem>
-                        <SelectItem value="shoes">Shoes</SelectItem>
-                        <SelectItem value="accessories">Accessories</SelectItem>
-                        <SelectItem value="electronics">Electronics</SelectItem>
-                        <SelectItem value="home">Home</SelectItem>
-                        <SelectItem value="beauty">Beauty</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="clothing">Ropa</SelectItem>
+                        <SelectItem value="shoes">Calzado</SelectItem>
+                        <SelectItem value="accessories">Accesorios</SelectItem>
+                        <SelectItem value="electronics">Electrónicos</SelectItem>
+                        <SelectItem value="home">Hogar</SelectItem>
+                        <SelectItem value="beauty">Belleza</SelectItem>
+                        <SelectItem value="other">Otro</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      El tipo de producto ayuda a clasificar correctamente los productos en las colecciones.
+                    </p>
                   </div>
                 </div>
 
@@ -546,7 +626,35 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="category">Categoría</Label>
+                      <div className="relative group">
+                        <span className="cursor-help text-muted-foreground">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="lucide lucide-help-circle"
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                            <path d="M12 17h.01" />
+                          </svg>
+                        </span>
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-2 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                          <p>
+                            Asegúrate de que la categoría coincida exactamente con el nombre en la tabla de categorías.
+                          </p>
+                          <p>Para accesorios, usa "Accesorios" y establece el tipo de producto como "accessories".</p>
+                        </div>
+                      </div>
+                    </div>
                     {!isAddingNewCategory ? (
                       <Select
                         value={form.getValues("category")}
@@ -560,7 +668,7 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                         }}
                       >
                         <SelectTrigger id="category" className={form.formState.errors.category ? "border-red-500" : ""}>
-                          <SelectValue placeholder="Select a category" />
+                          <SelectValue placeholder="Seleccionar una categoría" />
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map((category) => (
@@ -568,7 +676,7 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                               {category.name}
                             </SelectItem>
                           ))}
-                          <SelectItem value="new">+ Add New Category</SelectItem>
+                          <SelectItem value="new">+ Agregar Nueva Categoría</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
@@ -701,22 +809,64 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="gender">Gender</Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="gender">Género</Label>
+                      <div className="relative group">
+                        <span className="cursor-help text-muted-foreground">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="lucide lucide-help-circle"
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                            <path d="M12 17h.01" />
+                          </svg>
+                        </span>
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-2 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                          <p>
+                            <strong>men</strong>: Para productos masculinos
+                          </p>
+                          <p>
+                            <strong>women</strong>: Para productos femeninos
+                          </p>
+                          <p>
+                            <strong>unisex</strong>: Para productos unisex
+                          </p>
+                          <p>
+                            <strong>kids</strong>: Para productos infantiles
+                          </p>
+                          <p>
+                            <strong>accessories</strong>: Para accesorios
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                     <Select
                       onValueChange={(value) => form.setValue("gender", value)}
                       defaultValue={form.getValues("gender") || "unisex"}
                     >
                       <SelectTrigger id="gender">
-                        <SelectValue placeholder="Select gender" />
+                        <SelectValue placeholder="Seleccionar género" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="men">Men</SelectItem>
-                        <SelectItem value="women">Women</SelectItem>
+                        <SelectItem value="men">Hombres</SelectItem>
+                        <SelectItem value="women">Mujeres</SelectItem>
                         <SelectItem value="unisex">Unisex</SelectItem>
-                        <SelectItem value="kids">Kids</SelectItem>
-                        <SelectItem value="accessories">Accessories</SelectItem>
+                        <SelectItem value="kids">Niños</SelectItem>
+                        <SelectItem value="accessories">Accesorios</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Importante: Selecciona el género correcto para que el producto aparezca en la colección adecuada.
+                    </p>
                   </div>
                 </div>
 
@@ -895,21 +1045,62 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="inventory_status">Inventory Status</Label>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="inventory_status">Estado del Inventario</Label>
+                        <div className="relative group">
+                          <span className="cursor-help text-muted-foreground">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="lucide lucide-help-circle"
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                              <path d="M12 17h.01" />
+                            </svg>
+                          </span>
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-2 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                            <p>
+                              <strong>in_stock</strong>: Productos disponibles
+                            </p>
+                            <p>
+                              <strong>low_stock</strong>: Productos con inventario bajo
+                            </p>
+                            <p>
+                              <strong>out_of_stock</strong>: Productos sin inventario
+                            </p>
+                            <p>
+                              <strong>discontinued</strong>: Productos que ya no se venden
+                            </p>
+                            <p>Los productos con estado "discontinued" no aparecerán en ninguna colección.</p>
+                          </div>
+                        </div>
+                      </div>
                       <Select
                         onValueChange={(value) => form.setValue("inventory_status", value)}
                         defaultValue={form.getValues("inventory_status")}
                       >
                         <SelectTrigger id="inventory_status">
-                          <SelectValue placeholder="Select status" />
+                          <SelectValue placeholder="Seleccionar estado" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="in_stock">In Stock</SelectItem>
-                          <SelectItem value="low_stock">Low Stock</SelectItem>
-                          <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-                          <SelectItem value="backorder">Backorder</SelectItem>
+                          <SelectItem value="in_stock">En Stock</SelectItem>
+                          <SelectItem value="low_stock">Stock Bajo</SelectItem>
+                          <SelectItem value="out_of_stock">Agotado</SelectItem>
+                          <SelectItem value="discontinued">Descontinuado</SelectItem>
+                          <SelectItem value="backorder">Pedido Pendiente</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Los productos "descontinuados" no se mostrarán en ninguna colección.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -1224,4 +1415,3 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
     </form>
   )
 }
-
