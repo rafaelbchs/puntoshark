@@ -7,83 +7,76 @@ import { Button } from "@/components/ui/button"
 import { useCart } from "@/context/cart-context"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { CartDrawer } from "@/components/cart/cart-drawer"
-import { Logo } from "./logo"
-import { PromoBanner } from "./promo-banner"
-import type { PromoBanner as PromoBannerType } from "@/types/promo-banner"
 
 const navigationItems = [
   {
-    name: "MUJERES",
+    name: "WOMEN",
     href: "/collections/women",
     subcategories: [
       {
-        name: "Ropa",
+        name: "Clothing",
         items: [
-          { name: "Camisetas", href: "/collections/women/t-shirts" },
-          { name: "Sujetadores Deportivos", href: "/collections/women/sports-bras" },
+          { name: "T-Shirts", href: "/collections/women/t-shirts" },
+          { name: "Sports Bras", href: "/collections/women/sports-bras" },
           { name: "Leggings", href: "/collections/women/leggings" },
-          { name: "Pantalones Cortos", href: "/collections/women/shorts" },
-          { name: "Sudaderas con Capucha", href: "/collections/women/hoodies-sweatshirts" },
-          { name: "Chaquetas", href: "/collections/women/jackets" },
+          { name: "Shorts", href: "/collections/women/shorts" },
+          { name: "Hoodies & Sweatshirts", href: "/collections/women/hoodies-sweatshirts" },
+          { name: "Jackets", href: "/collections/women/jackets" },
         ],
       },
       {
-        name: "Colecciones",
+        name: "Collections",
         items: [
-          { name: "Nuevos Lanzamientos", href: "/collections/women/new-releases" },
-          { name: "Más Vendidos", href: "/collections/women/bestsellers" },
-          { name: "Esenciales", href: "/collections/women/essentials" },
-          { name: "Sin Costuras", href: "/collections/women/seamless" },
+          { name: "New Releases", href: "/collections/women/new-releases" },
+          { name: "Bestsellers", href: "/collections/women/bestsellers" },
+          { name: "Essentials", href: "/collections/women/essentials" },
+          { name: "Seamless", href: "/collections/women/seamless" },
         ],
       },
     ],
   },
   {
-    name: "HOMBRES",
+    name: "MEN",
     href: "/collections/men",
     subcategories: [
       {
-        name: "Ropa",
+        name: "Clothing",
         items: [
-          { name: "Camisetas", href: "/collections/men/t-shirts" },
-          { name: "Sudaderas con Capucha", href: "/collections/men/hoodies-sweatshirts" },
-          { name: "Pantalones Cortos", href: "/collections/men/shorts" },
-          { name: "Pantalones de Jogging", href: "/collections/men/joggers" },
-          { name: "Chaquetas", href: "/collections/men/jackets" },
-          { name: "Camisetas sin Mangas", href: "/collections/men/tanks" },
+          { name: "T-Shirts", href: "/collections/men/t-shirts" },
+          { name: "Hoodies & Sweatshirts", href: "/collections/men/hoodies-sweatshirts" },
+          { name: "Shorts", href: "/collections/men/shorts" },
+          { name: "Joggers", href: "/collections/men/joggers" },
+          { name: "Jackets", href: "/collections/men/jackets" },
+          { name: "Tanks", href: "/collections/men/tanks" },
         ],
       },
       {
-        name: "Colecciones",
+        name: "Collections",
         items: [
-          { name: "Nuevos Lanzamientos", href: "/collections/men/new-releases" },
-          { name: "Más Vendidos", href: "/collections/men/bestsellers" },
-          { name: "Esenciales", href: "/collections/men/essentials" },
+          { name: "New Releases", href: "/collections/men/new-releases" },
+          { name: "Bestsellers", href: "/collections/men/bestsellers" },
+          { name: "Essentials", href: "/collections/men/essentials" },
         ],
       },
     ],
   },
   {
-    name: "ACCESORIOS",
+    name: "ACCESSORIES",
     href: "/collections/accessories",
     subcategories: [
       {
-        name: "Categorías",
+        name: "Categories",
         items: [
-          { name: "Bolsos", href: "/collections/accessories/bags" },
-          { name: "Sombreros y Gorras", href: "/collections/accessories/hats-caps" },
-          { name: "Botellas de Agua", href: "/collections/accessories/water-bottles" },
+          { name: "Bags", href: "/collections/accessories/bags" },
+          { name: "Hats & Caps", href: "/collections/accessories/hats-caps" },
+          { name: "Water Bottles", href: "/collections/accessories/water-bottles" },
         ],
       },
     ],
   },
 ]
 
-interface NavbarProps {
-  banner: PromoBannerType | null
-}
-
-export function Navbar({ banner }: NavbarProps) {
+export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
@@ -115,20 +108,33 @@ export function Navbar({ banner }: NavbarProps) {
     <>
       {/* Main header */}
       <header
-        className="sticky top-0 left-0 right-0 z-50 bg-white"
-        style={{
-          boxShadow: isScrolled ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-          transition: "box-shadow 0.3s",
-        }}
+        className={`sticky top-0 left-0 right-0 z-50 ${isScrolled ? "bg-white shadow-sm" : "bg-white"}`}
+        style={{ transition: "box-shadow 0.3s, background-color 0.3s" }}
       >
         {/* Promo banner */}
-        <PromoBanner banner={banner} />
+        <div className="bg-black text-white text-center py-2 text-sm font-medium">
+          GET TWO PAIRS OF ARRIVAL SHORTS FOR $40 🔥
+        </div>
 
         <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
             <div className="flex-shrink-0">
-              <Logo />
+              <Link href="/" className="flex items-center">
+                <div
+                  style={{
+                    color: "#000000",
+                    fontWeight: 700,
+                    fontSize: "1.25rem",
+                    lineHeight: "1.75rem",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    transition: "none",
+                  }}
+                >
+                  PUNTOSHARK
+                </div>
+              </Link>
             </div>
 
             {/* Desktop Navigation */}
@@ -204,7 +210,21 @@ export function Navbar({ banner }: NavbarProps) {
         <div className="lg:hidden fixed inset-0 z-50 bg-white">
           <div className="flex flex-col h-full overflow-y-auto pb-12 pt-4 px-4">
             <div className="flex items-center justify-between mb-6 border-b border-gray-200 pb-4">
-              <Logo />
+              <Link href="/" className="flex items-center" onClick={() => setMobileMenuOpen(false)}>
+                <div
+                  style={{
+                    color: "#000000",
+                    fontWeight: 700,
+                    fontSize: "1.25rem",
+                    lineHeight: "1.75rem",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    transition: "none",
+                  }}
+                >
+                  PUNTOSHARK
+                </div>
+              </Link>
               <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} className="text-gray-900">
                 <Menu className="h-6 w-6" />
               </Button>
@@ -251,21 +271,21 @@ export function Navbar({ banner }: NavbarProps) {
                   className="text-base font-medium text-gray-900 block py-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Cuenta
+                  Account
                 </Link>
                 <Link
                   href="/wishlist"
                   className="text-base font-medium text-gray-900 block py-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Lista de Deseos
+                  Wishlist
                 </Link>
                 <Link
                   href="/help"
                   className="text-base font-medium text-gray-900 block py-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Ayuda
+                  Help
                 </Link>
               </div>
             </div>

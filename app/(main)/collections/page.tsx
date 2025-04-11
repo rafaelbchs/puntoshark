@@ -4,20 +4,20 @@ import Image from "next/image"
 export default function CollectionsPage() {
   const collections = [
     {
-      name: "Men's Collection",
-      description: "Explore our latest men's fashion",
+      name: "Colección para Hombres",
+      description: "Explora nuestra última moda para hombres",
       image: "/placeholder.svg?height=600&width=800",
       href: "/collections/men",
     },
     {
-      name: "Women's Collection",
-      description: "Discover stylish women's clothing",
+      name: "Colección para Mujeres",
+      description: "Descubre ropa elegante para mujeres",
       image: "/placeholder.svg?height=600&width=800",
       href: "/collections/women",
     },
     {
-      name: "Accessories",
-      description: "Complete your look with our accessories",
+      name: "Accesorios",
+      description: "Completa tu look con nuestros accesorios",
       image: "/placeholder.svg?height=600&width=800",
       href: "/collections/accessories",
     },
@@ -27,7 +27,7 @@ export default function CollectionsPage() {
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 pt-24">
         <div className="container mx-auto px-4 py-8">
-          <h1 className="text-3xl font-bold mb-8">Collections</h1>
+          <h1 className="text-3xl font-bold mb-8">Colecciones</h1>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {collections.map((collection) => (
@@ -57,4 +57,3 @@ export default function CollectionsPage() {
     </div>
   )
 }
-

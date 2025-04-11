@@ -309,4 +309,3 @@ export default function ProductForm({ product, isEditing = false }: ProductFormP
     </form>
   )
 }
-

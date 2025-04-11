@@ -31,8 +31,6 @@ async function fetchOrderById(orderId: string) {
   }
 }
 
-// Modifica el componente ConfirmationPage para manejar mejor la transición
-
 export default function ConfirmationPage() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get("orderId")
@@ -182,12 +180,12 @@ export default function ConfirmationPage() {
           if (order.items.length <= 5) {
             shareText += `\n\nProductos:`
             order.items.forEach((item, index) => {
-              shareText += `\n${index + 1}. ${item.name} (${item.quantity}x) - $${(item.price * item.quantity).toFixed(2)}`
+              shareText += `\n${index + 1}. ${item.name} (${item.quantity}x) - ${(item.price * item.quantity).toFixed(2)}`
             })
           }
 
           // Add the total amount at the bottom
-          shareText += `\n\nMonto total: $${order.total.toFixed(2)}`
+          shareText += `\n\nMonto total: ${order.total.toFixed(2)}`
 
           // Añadir mensaje de agradecimiento
           shareText += `\n\n¡Gracias por tu compra! Puedes hacer seguimiento de tu pedido usando el número de orden.`
@@ -259,12 +257,12 @@ export default function ConfirmationPage() {
       if (order.items.length <= 5) {
         messageText += `\n\nProductos:`
         order.items.forEach((item, index) => {
-          messageText += `\n${index + 1}. ${item.name} (${item.quantity}x) - $${(item.price * item.quantity).toFixed(2)}`
+          messageText += `\n${index + 1}. ${item.name} (${item.quantity}x) - ${(item.price * item.quantity).toFixed(2)}`
         })
       }
 
       // Add total amount at the bottom
-      messageText += `\n\nMonto total: $${order.total.toFixed(2)}`
+      messageText += `\n\nMonto total: ${order.total.toFixed(2)}`
     }
 
     // Use the regular WhatsApp link format with the phone number
@@ -472,4 +470,3 @@ function getStatusText(status: string): string {
       return status
   }
 }
-

@@ -10,7 +10,7 @@ export default async function GenderCollectionPage({
   const { gender } = params
 
   // Format gender for display
-  const formattedGender = gender.charAt(0).toUpperCase() + gender.slice(1)
+  const formattedGender = getGenderText(gender)
 
   // Special case for accessories
   const isAccessories = gender.toLowerCase() === "accessories"
@@ -24,7 +24,9 @@ export default async function GenderCollectionPage({
   if (isAccessories) {
     // For accessories page, we'll just show accessories
     // First check if we have an accessories category
-    const accessoriesCategory = categories.find((cat) => cat.name.toLowerCase() === "accessories")
+    const accessoriesCategory = categories.find(
+      (cat) => cat.name.toLowerCase() === "accessories" || cat.name.toLowerCase() === "accesorios",
+    )
 
     if (accessoriesCategory) {
       filteredCategories = [accessoriesCategory]
@@ -32,7 +34,7 @@ export default async function GenderCollectionPage({
       // If no accessories category exists yet, create a placeholder
       filteredCategories = [
         {
-          name: "Accessories",
+          name: "Accesorios",
           subcategories: [],
         },
       ]
@@ -64,7 +66,7 @@ export default async function GenderCollectionPage({
       <div className="flex-1 pt-24">
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold mb-8">
-            {isAccessories ? "Accessories" : `${formattedGender}'s Collection`}
+            {isAccessories ? "Accesorios" : `Colección para ${formattedGender}`}
           </h1>
 
           {filteredCategories.length === 0 ? (
@@ -87,15 +89,15 @@ export default async function GenderCollectionPage({
                   <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-semibold tracking-tight">No Categories Found</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">No se encontraron categorías</h2>
               <p className="mt-2 text-muted-foreground max-w-md">
-                We couldn't find any categories for this collection. Please check back later.
+                No pudimos encontrar categorías para esta colección. Por favor, vuelve más tarde.
               </p>
               <Link
                 href="/"
                 className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
-                Return to Home
+                Volver al Inicio
               </Link>
             </div>
           ) : (
@@ -123,8 +125,8 @@ export default async function GenderCollectionPage({
                       <h3 className="text-xl font-medium">{category.name}</h3>
                       <p className="mt-1 text-muted-foreground">
                         {category.subcategories.length > 0
-                          ? `${category.subcategories.length} subcategories`
-                          : "Explore our collection"}
+                          ? `${category.subcategories.length} subcategorías`
+                          : "Explora nuestra colección"}
                       </p>
                     </div>
                   </Link>
@@ -138,3 +140,18 @@ export default async function GenderCollectionPage({
   )
 }
 
+// Helper function to translate gender
+function getGenderText(gender: string): string {
+  switch (gender.toLowerCase()) {
+    case "men":
+      return "Hombres"
+    case "women":
+      return "Mujeres"
+    case "unisex":
+      return "Unisex"
+    case "accessories":
+      return "Accesorios"
+    default:
+      return gender.charAt(0).toUpperCase() + gender.slice(1)
+  }
+}

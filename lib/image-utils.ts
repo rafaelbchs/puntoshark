@@ -1,11 +1,3 @@
-/**
- * Utility functions for handling product images
- */
-
-/**
- * Gets a properly formatted URL for product card images
- * Handles blob URLs, Supabase URLs, and fallbacks
- */
 export function getProductCardImageUrl(url: string): string {
   if (!url) return "/placeholder.svg?height=400&width=400"
 
@@ -70,4 +62,3 @@ export function getOptimizedImageUrl(url: string, width?: number, height?: numbe
 export function getThumbnailUrl(url: string): string {
   return getOptimizedImageUrl(url, 200, 200)
 }
-

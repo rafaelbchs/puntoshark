@@ -39,7 +39,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium">Your Cart ({items.length})</h2>
+            <h2 className="text-lg font-medium">Tu Carrito ({items.length})</h2>
             <button onClick={onClose} className="text-gray-500 hover:text-black">
               <X className="h-5 w-5" />
             </button>
@@ -50,9 +50,9 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             {items.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <ShoppingBagIcon className="h-16 w-16 text-gray-300 mb-4" />
-                <h3 className="text-lg font-medium mb-2">Tu carrito esta vacio</h3>
-                <p className="text-gray-500 mb-6">Parece que aun no has agregado nada a tu carrito.</p>
-                <Button onClick={onClose}>Continua Comprando</Button>
+                <h3 className="text-lg font-medium mb-2">Tu carrito está vacío</h3>
+                <p className="text-gray-500 mb-6">Parece que aún no has añadido ningún artículo a tu carrito.</p>
+                <Button onClick={onClose}>Continuar Comprando</Button>
               </div>
             ) : (
               <ul className="divide-y divide-gray-200">
@@ -126,7 +126,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                   <p className="font-medium">${subtotal.toFixed(2)}</p>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <p className="text-gray-500">Envio</p>
+                  <p className="text-gray-500">Envío</p>
                   <p className="font-medium">${shipping.toFixed(2)}</p>
                 </div>
                 <div className="flex justify-between text-base font-medium pt-2 border-t border-gray-200">
@@ -138,11 +138,11 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
               <div className="mt-6">
                 <Link href="/checkout" passHref>
                   <Button onClick={onClose} className="w-full bg-black hover:bg-gray-900 text-white py-3 rounded-none">
-                    Realizar Compra
+                    Finalizar Compra
                   </Button>
                 </Link>
                 <button onClick={onClose} className="mt-4 text-sm text-center w-full text-gray-500 hover:text-black">
-                  Seguir Comprando
+                  Continuar Comprando
                 </button>
               </div>
             </div>
@@ -172,4 +172,3 @@ function ShoppingBagIcon({ className }: { className?: string }) {
     </svg>
   )
 }
-

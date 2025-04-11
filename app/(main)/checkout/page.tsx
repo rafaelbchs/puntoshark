@@ -28,9 +28,6 @@ export default function CheckoutPage() {
     return null
   }
 
-  // Añade este código justo después de la línea "if (typeof window !== "undefined" && items.length === 0) {"
-  // para crear un overlay de carga
-
   // Añade este componente de overlay de carga
   const LoadingOverlay = () => (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -45,7 +42,6 @@ export default function CheckoutPage() {
   // Determine if cash payment should be shown
   const showCashOption = deliveryMethod === "delivery" || deliveryMethod === "pickup"
 
-  // Reemplaza la función handleSubmit con esta versión mejorada que muestra un overlay de carga
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsSubmitting(true)
@@ -108,7 +104,7 @@ export default function CheckoutPage() {
   return (
     <div className="container mx-auto py-10 px-4">
       {isSubmitting && <LoadingOverlay />}
-      <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+      <h1 className="text-3xl font-bold mb-8">Finalizar Compra</h1>
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
@@ -247,4 +243,3 @@ export default function CheckoutPage() {
     </div>
   )
 }
-
